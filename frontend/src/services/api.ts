@@ -15,13 +15,9 @@ export const searchTrack = async (query: string): Promise<SearchResponse> => {
   return response.data;
 };
 
-export const analyzeTrack = async (trackId: string): Promise<void> => {
-  await api.post('/api/analyze', { track_id: trackId });
-};
-
 export const getRecommendations = async (trackId: string): Promise<Track[]> => {
-  const response = await api.get<Track[]>(`/api/recommendations/${trackId}`);
-  return response.data;
+  const response = await api.post<Track[]>(`/api/recommendations/${trackId}`);
+  return response.data.tracks;
 };
 
 export default api;

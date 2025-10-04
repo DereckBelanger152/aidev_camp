@@ -3,7 +3,7 @@ import { SearchBar } from './components/SearchBar';
 import { ConfirmationCard } from './components/ConfirmationCard';
 import { ResultsGrid } from './components/ResultsGrid';
 import type { Track, AppState } from './types/index';
-import { searchTrack, analyzeTrack, getRecommendations } from './services/api';
+import { searchTrack, getRecommendations } from './services/api';
 import { Music2, Loader2 } from 'lucide-react';
 
 function App() {
@@ -43,7 +43,6 @@ function App() {
     setError(null);
 
     try {
-      await analyzeTrack(confirmedTrack.id);
       const results = await getRecommendations(confirmedTrack.id);
       setRecommendations(results);
       setAppState('results');
