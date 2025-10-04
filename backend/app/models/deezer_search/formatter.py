@@ -12,8 +12,10 @@ class TrackFormatter:
         lines = []
         for index, track in enumerate(tracks, start=1):
             preview_info = track.preview or "No preview available"
+            genre_info = track.genre or "Unknown style"
             lines.append(
                 f"{index}. {track.title} - {track.artist} (Album: {track.album})\n"
+                f"   Style: {genre_info}\n"
                 f"   Track ID: {track.id}\n"
                 f"   Listen: {track.link}\n"
                 f"   Preview: {preview_info}"

@@ -14,3 +14,4 @@ class DeezerTrack:
     album: str
     link: str
     preview: Optional[str]
+    genre: Optional[str]
