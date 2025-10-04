@@ -33,9 +33,10 @@ aider_camp/
 │   ├── src/
 │   │   ├── components/
 │   │   │   ├── SearchBar.tsx
-│   │   │   ├── TrackCard.tsx
-│   │   │   ├── AudioPlayer.tsx
-│   │   │   └── RecommendationGrid.tsx
+│   │   │   ├── ConfirmationCard.tsx
+│   │   │   ├── ResultCard.tsx
+│   │   │   ├── ResultsGrid.tsx
+│   │   │   └── AudioPlayer.tsx
 │   │   ├── services/
 │   │   │   └── api.ts
 │   │   ├── App.tsx
@@ -61,15 +62,32 @@ aider_camp/
 
 ## Flux de données
 
-1. **Recherche**: User entre titre → Frontend → Backend → Deezer API → Résultats
-2. **Sélection**: User clique sur track → Backend télécharge preview (30s)
-3. **Analyse**: Audio → Preprocessing → Embedding Model → Feature vector
+1. **Recherche initiale**:
+   - User entre titre exact (recherche stricte, aucune faute permise)
+   - Frontend envoie query tel quel → Backend → Deezer API
+   - Backend retourne premier résultat exact
+
+2. **Confirmation**:
+   - Backend répond: "C'est bien ce morceau que vous voulez rechercher?"
+   - Affiche: titre, artiste, cover, preview audio (30s)
+   - User peut play l'extrait pour confirmer
+   - Boutons: "Oui, continuer" / "Non, annuler"
+
+3. **Analyse audio** (si confirmé):
+   - Backend télécharge preview MP3 (30s)
+   - Preprocessing audio (librosa)
+   - Génération embedding via modèle HF
+   - Feature vector extrait
+
 4. **Recherche similaire**:
-   - Backend récupère catalogue Deezer (ou DB pré-calculée)
-   - Calcule embeddings pour tracks candidats
-   - Cosine similarity entre vecteurs
-   - Retourne top-N similaires
-5. **Affichage**: Cards avec preview, play button, métadonnées
+   - Pré-filtrage: Embedding model HF sur catalogue Deezer
+   - Filtrage fin: Bibliothèque Python (librosa features + cosine similarity)
+   - Sélection top-3 tracks mélodiquement similaires
+
+5. **Affichage résultats**:
+   - 3 cards avec: cover, titre, artiste
+   - Play button pour preview (30s)
+   - Button "Save to Spotify" (placeholder, optionnel si temps)
 
 ---
 
@@ -80,29 +98,37 @@ aider_camp/
 #### `POST /api/search`
 ```json
 Request: { "query": "Bohemian Rhapsody" }
-Response: [
-  {
-    "id": "3135556",
-    "title": "Bohemian Rhapsody",
-    "artist": "Queen",
-    "preview_url": "https://...",
-    "cover": "https://..."
-  }
-]
+Response: {
+  "id": "3135556",
+  "title": "Bohemian Rhapsody",
+  "artist": "Queen",
+  "preview_url": "https://...",
+  "cover": "https://...",
+  "message": "C'est bien ce morceau que vous voulez rechercher?"
+}
 ```
 
-#### `POST /api/recommend`
+#### `POST /api/analyze`
 ```json
 Request: { "track_id": "3135556" }
+Response: {
+  "status": "processing",
+  "message": "Analyse en cours..."
+}
+```
+
+#### `GET /api/recommendations/{track_id}`
+```json
 Response: [
   {
     "id": "...",
     "title": "...",
     "artist": "...",
-    "similarity_score": 0.92,
+    "similarity_score": 0.89,
     "preview_url": "...",
     "cover": "..."
   }
+  // Top 3 résultats
 ]
 ```
 
@@ -129,19 +155,24 @@ Response: [
 ### Frontend - Composants
 
 #### `SearchBar`
-- Input + debounce
-- Affiche suggestions temps réel
-- Gère sélection
+- Input simple (pas de debounce)
+- Submit direct au backend
+- Pas de suggestions
 
-#### `TrackCard`
-- Affiche cover, titre, artiste
-- Button "Find Similar"
-- Mini player intégré
+#### `ConfirmationCard`
+- Affiche track trouvé: cover, titre, artiste
+- Message: "C'est bien ce morceau que vous voulez rechercher?"
+- Audio player intégré (preview 30s)
+- Boutons: "Oui, continuer" / "Non, annuler"
 
-#### `RecommendationGrid`
-- Grid responsive de cards
-- Score de similarité visible
-- Auto-play optionnel
+#### `ResultCard`
+- Affiche: cover, titre, artiste
+- Play button pour preview (30s)
+- Button "Save to Spotify" (placeholder)
+
+#### `ResultsGrid`
+- Grid de 3 cards
+- Layout responsive
 
 ---
 
@@ -163,20 +194,22 @@ Response: [
 ## Optimisations Hackathon
 
 ### Phase 1 (MVP - 4h)
-- Backend: Deezer API + librosa features uniquement (skip HF)
-- Frontend: Search + 1 player + grid simple
-- Similarity: Cosine sur MFCC seulement
+- Backend: Deezer API + librosa features uniquement (skip HF initialement)
+- Frontend: SearchBar → ConfirmationCard → ResultsGrid (3 cards)
+- Similarity: Cosine sur MFCC + spectral features
+- Flow complet: recherche → confirmation → analyse → 3 résultats
 
 ### Phase 2 (Enhancement - 2h)
-- Intégrer modèle HF pour embeddings
-- Améliorer UI/UX
+- Intégrer modèle HF pour embeddings (amélioration similarité)
+- Améliorer UI/UX (animations, transitions)
 - Cache embeddings calculés
+- Gestion erreurs robuste
 
-### Phase 3 (Polish - 2h)
-- Animations
-- Gestion erreurs
-- Loading states
-- Deploy
+### Phase 3 (Polish - 1-2h)
+- Loading states élégants
+- Placeholder "Save to Spotify" (si temps)
+- Polish visuel final
+- Tests end-to-end
 
 ---
 
@@ -220,9 +253,10 @@ react-query
 
 ## Démo flow
 
-1. User tape "Stairway to Heaven"
-2. Sélectionne track Led Zeppelin
-3. Backend analyse → 512-dim embedding
-4. Compare avec 100 tracks populaires (pré-indexées)
-5. Retourne 12 tracks similaires (prog rock, guitare acoustique/électrique, structure similaire)
-6. User écoute previews dans grid
+1. User tape "Stairway to Heaven" (recherche exacte)
+2. Backend retourne premier match Deezer
+3. Confirmation: "C'est bien ce morceau que vous voulez rechercher?" avec preview audio
+4. User play l'extrait et clique "Oui, continuer"
+5. Backend: analyse → embedding HF → filtrage librosa
+6. Retourne 3 tracks mélodiquement similaires (guitare acoustique/électrique, structure/tempo similaire)
+7. User voit 3 cards, peut play previews et (optionnel) save to Spotify
