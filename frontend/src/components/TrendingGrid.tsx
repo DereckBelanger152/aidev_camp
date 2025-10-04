@@ -10,36 +10,29 @@ interface TrendingGridProps {
 
 export const TrendingGrid = ({ tracks, onTrackClick, isLoading = false }: TrendingGridProps) => {
   const [playingTrackId, setPlayingTrackId] = useState<string | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioRefs = useRef<{ [key: string]: HTMLAudioElement }>({});
 
-  const handlePlayPause = async (e: React.MouseEvent, track: Track) => {
+  const handlePlayPause = (e: React.MouseEvent, track: Track) => {
     e.stopPropagation();
 
     if (playingTrackId === track.id) {
       // Pause current track
-      audioRef.current?.pause();
+      audioRefs.current[track.id]?.pause();
       setPlayingTrackId(null);
     } else {
       // Stop previous track if playing
-      if (audioRef.current) {
-        audioRef.current.pause();
+      if (playingTrackId && audioRefs.current[playingTrackId]) {
+        audioRefs.current[playingTrackId].pause();
+        audioRefs.current[playingTrackId].currentTime = 0;
       }
 
-      // Play new track
-      const audio = new Audio(track.preview_url);
-      audioRef.current = audio;
-
-      try {
-        await audio.play();
+      // Play new track from audio element in DOM
+      const audioElement = audioRefs.current[track.id];
+      if (audioElement) {
+        audioElement.play().catch((error) => {
+          console.error('Error playing audio:', error);
+        });
         setPlayingTrackId(track.id);
-
-        // Reset when track ends
-        audio.onended = () => {
-          setPlayingTrackId(null);
-        };
-      } catch (error) {
-        console.error('Error playing audio:', error);
-        setPlayingTrackId(null);
       }
     }
   };
@@ -50,7 +43,7 @@ export const TrendingGrid = ({ tracks, onTrackClick, isLoading = false }: Trendi
           Essayez avec ces hits populaires
         </h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-6 max-w-3xl mx-auto">
-          {[...Array(8)].map((_, i) => (
+          {[...Array(9)].map((_, i) => (
             <div key={i} className="animate-pulse">
               <div className="aspect-square bg-gray-800 rounded-xl mb-3"></div>
               <div className="h-4 bg-gray-800 rounded mb-2"></div>
@@ -77,6 +70,15 @@ export const TrendingGrid = ({ tracks, onTrackClick, isLoading = false }: Trendi
             key={track.id}
             className="group relative cursor-pointer transition-all duration-300 hover:scale-105"
           >
+            {/* Hidden audio element */}
+            <audio
+              ref={(el) => {
+                if (el) audioRefs.current[track.id] = el;
+              }}
+              src={track.preview_url}
+              onEnded={() => setPlayingTrackId(null)}
+            />
+
             {/* Album Cover */}
             <div
               className="relative aspect-square rounded-xl overflow-hidden shadow-lg"

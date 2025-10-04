@@ -4,6 +4,7 @@ import { SearchBar } from './components/SearchBar';
 import { ConfirmationCard } from './components/ConfirmationCard';
 import { ResultsGrid } from './components/ResultsGrid';
 import { TrendingGrid } from './components/TrendingGrid';
+import { AudioWaves } from './components/AudioWaves';
 import type { Track, AppState } from './types/index';
 import { searchTrack, getRecommendations, getTrendingTracks } from './services/api';
 import { Music2, Loader2 } from 'lucide-react';
@@ -22,7 +23,7 @@ function App() {
     const fetchTrending = async () => {
       setIsTrendingLoading(true);
       try {
-        const tracks = await getTrendingTracks(8);
+        const tracks = await getTrendingTracks(9);
         setTrendingTracks(tracks);
       } catch (err) {
         console.error('Failed to fetch trending tracks:', err);
@@ -97,6 +98,9 @@ function App() {
   return (
     <>
       <Navbar />
+
+      {/* Audio wave visualizer across full page */}
+      <AudioWaves />
 
       <div className="min-h-screen flex flex-col items-center justify-center p-6 pt-28">
         {/* Header - Only show on search page */}
