@@ -1,15 +1,64 @@
-import { useState } from 'react';
-import { SearchBar } from './components/SearchBar';
-import { ConfirmationCard } from './components/ConfirmationCard';
-import { ResultsGrid } from './components/ResultsGrid';
-import type { Track, AppState } from './types/index';
-import { searchTrack, analyzeTrack, getRecommendations } from './services/api';
-import { Music2, Loader2 } from 'lucide-react';
+import { useState } from "react";
+import { SearchBar } from "./components/SearchBar";
+import { ConfirmationCard } from "./components/ConfirmationCard";
+import { ResultsGrid } from "./components/ResultsGrid";
+import type { Track, AppState } from "./types/index";
+import { searchTrack, analyzeTrack, getRecommendations } from "./services/api";
+import { Music2, Loader2 } from "lucide-react";
+
+// Données placeholder pour visualiser l'interface
+const PLACEHOLDER_TRACK: Track = {
+  id: "1",
+  title: "Bohemian Rhapsody",
+  artist: "Queen",
+  preview_url:
+    "https://cdns-preview-e.dzcdn.net/stream/c-e77d23e0c8ed7567a507a6d1b6a9ca1b-2.mp3",
+  cover:
+    "https://e-cdns-images.dzcdn.net/images/cover/b84fb43f2f7cec18245b23b96e5c46f4/500x500-000000-80-0-0.jpg",
+};
+
+const PLACEHOLDER_RECOMMENDATIONS: Track[] = [
+  {
+    id: "2",
+    title: "Stairway to Heaven",
+    artist: "Led Zeppelin",
+    preview_url:
+      "https://cdns-preview-d.dzcdn.net/stream/c-d0b5abac9e581fc1f1a12f5ea7b21e2e-2.mp3",
+    cover:
+      "https://e-cdns-images.dzcdn.net/images/cover/53addd47f8e8bcf8b77e1c795c93c3a3/500x500-000000-80-0-0.jpg",
+    similarity_score: 0.92,
+  },
+  {
+    id: "3",
+    title: "Hotel California",
+    artist: "Eagles",
+    preview_url:
+      "https://cdns-preview-b.dzcdn.net/stream/c-b3e5cb26d7a5aaee5e94c58e55a1fbfc-2.mp3",
+    cover:
+      "https://e-cdns-images.dzcdn.net/images/cover/2fb3e4cc3a0a629e0e6bd16ea7f64c5a/500x500-000000-80-0-0.jpg",
+    similarity_score: 0.89,
+  },
+  {
+    id: "4",
+    title: "Comfortably Numb",
+    artist: "Pink Floyd",
+    preview_url:
+      "https://cdns-preview-f.dzcdn.net/stream/c-f8f86ee0b5c3c0fa4b43b9b8e8c5e5f8-2.mp3",
+    cover:
+      "https://e-cdns-images.dzcdn.net/images/cover/991e0dbc62b1a04b62f3a5c2c1e1bff1/500x500-000000-80-0-0.jpg",
+    similarity_score: 0.85,
+  },
+];
 
 function App() {
-  const [appState, setAppState] = useState<AppState>('search');
-  const [confirmedTrack, setConfirmedTrack] = useState<Track | null>(null);
-  const [recommendations, setRecommendations] = useState<Track[]>([]);
+  // PLACEHOLDER MODE: Décommentez pour voir toute l'interface
+  const [appState, setAppState] = useState<AppState>("search"); // Change de 'search' à 'results' à 'confirmation' à 'analyzing'
+  const [confirmedTrack, setConfirmedTrack] = useState<Track | null>(
+    PLACEHOLDER_TRACK
+  );
+  const [recommendations, setRecommendations] = useState<Track[]>(
+    PLACEHOLDER_RECOMMENDATIONS
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -26,9 +75,9 @@ function App() {
         preview_url: result.preview_url,
         cover: result.cover,
       });
-      setAppState('confirmation');
+      setAppState("confirmation");
     } catch (err) {
-      setError('Impossible de trouver ce morceau. Vérifiez l\'orthographe.');
+      setError("Impossible de trouver ce morceau. Vérifiez l'orthographe.");
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -39,17 +88,17 @@ function App() {
     if (!confirmedTrack) return;
 
     setIsLoading(true);
-    setAppState('analyzing');
+    setAppState("analyzing");
     setError(null);
 
     try {
       await analyzeTrack(confirmedTrack.id);
       const results = await getRecommendations(confirmedTrack.id);
       setRecommendations(results);
-      setAppState('results');
+      setAppState("results");
     } catch (err) {
-      setError('Erreur lors de l\'analyse. Veuillez réessayer.');
-      setAppState('confirmation');
+      setError("Erreur lors de l'analyse. Veuillez réessayer.");
+      setAppState("confirmation");
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -58,14 +107,14 @@ function App() {
 
   const handleCancel = () => {
     setConfirmedTrack(null);
-    setAppState('search');
+    setAppState("search");
     setError(null);
   };
 
   const handleNewSearch = () => {
     setConfirmedTrack(null);
     setRecommendations([]);
-    setAppState('search');
+    setAppState("search");
     setError(null);
   };
 
@@ -93,11 +142,11 @@ function App() {
 
       {/* Main Content */}
       <div className="w-full max-w-7xl">
-        {appState === 'search' && (
+        {appState === "search" && (
           <SearchBar onSearch={handleSearch} isLoading={isLoading} />
         )}
 
-        {appState === 'confirmation' && confirmedTrack && (
+        {appState === "confirmation" && confirmedTrack && (
           <ConfirmationCard
             track={confirmedTrack}
             onConfirm={handleConfirm}
@@ -106,7 +155,7 @@ function App() {
           />
         )}
 
-        {appState === 'analyzing' && (
+        {appState === "analyzing" && (
           <div className="flex flex-col items-center justify-center gap-6 py-20">
             <Loader2 className="text-neon-cyan animate-spin" size={64} />
             <p className="text-2xl text-gray-300">Analyse en cours...</p>
@@ -116,7 +165,7 @@ function App() {
           </div>
         )}
 
-        {appState === 'results' && (
+        {appState === "results" && (
           <>
             <ResultsGrid tracks={recommendations} />
             <div className="text-center mt-8">
