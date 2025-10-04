@@ -4,6 +4,8 @@ import { SearchBar } from './components/SearchBar';
 import { ConfirmationCard } from './components/ConfirmationCard';
 import { ResultsGrid } from './components/ResultsGrid';
 import { TrendingGrid } from './components/TrendingGrid';
+import { AudioWaves } from './components/AudioWaves';
+import { About } from './components/About';
 import type { Track, AppState } from './types/index';
 import { searchTrack, getRecommendations, getTrendingTracks } from './services/api';
 import { Music2, Loader2 } from 'lucide-react';
@@ -22,7 +24,7 @@ function App() {
     const fetchTrending = async () => {
       setIsTrendingLoading(true);
       try {
-        const tracks = await getTrendingTracks(8);
+        const tracks = await getTrendingTracks(9);
         setTrendingTracks(tracks);
       } catch (err) {
         console.error('Failed to fetch trending tracks:', err);
@@ -94,9 +96,23 @@ function App() {
     await handleSearch(title);
   };
 
+  const handleNavigation = (page: 'home' | 'about') => {
+    if (page === 'home') {
+      setAppState('search');
+      setConfirmedTrack(null);
+      setRecommendations([]);
+      setError(null);
+    } else if (page === 'about') {
+      setAppState('about');
+    }
+  };
+
   return (
     <>
-      <Navbar />
+      <Navbar onNavigate={handleNavigation} />
+
+      {/* Audio wave visualizer across full page */}
+      <AudioWaves />
 
       <div className="min-h-screen flex flex-col items-center justify-center p-6 pt-28">
         {/* Header - Only show on search page */}
@@ -152,16 +168,20 @@ function App() {
 
         {appState === 'results' && (
           <>
-            <ResultsGrid tracks={recommendations} />
-            <div className="text-center mt-8">
+            <div className="text-center mb-8">
               <button
                 onClick={handleNewSearch}
-                className="px-8 py-3 bg-gradient-to-r from-neon-purple to-neon-cyan rounded-xl font-semibold text-white hover:shadow-lg hover:shadow-neon-cyan/50 transition-all duration-300"
+                className="px-10 py-4 bg-gradient-to-r from-pink-500 to-purple-500 rounded-xl font-bold text-white text-lg hover:shadow-2xl hover:shadow-pink-500/50 transition-all duration-300 hover:scale-105"
               >
-                Nouvelle recherche
+                ← Nouvelle recherche
               </button>
             </div>
+            <ResultsGrid tracks={recommendations} />
           </>
+        )}
+
+        {appState === 'about' && (
+          <About />
         )}
       </div>
 

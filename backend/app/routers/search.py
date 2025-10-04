@@ -60,6 +60,7 @@ async def get_trending_tracks(limit: int = 8):
     Get trending/popular tracks from the database.
 
     Returns the top tracks sorted by popularity (rank).
+    Refreshes preview URLs from Deezer API to ensure they're valid.
 
     Args:
         limit: Number of tracks to return (default: 8)
@@ -74,6 +75,7 @@ async def get_trending_tracks(limit: int = 8):
         logger.info(f"Fetching {limit} trending tracks")
 
         vector_db = get_vector_db_service()
+        deezer_service = get_deezer_service()
 
         # Get all tracks from the database
         results = vector_db.collection.get(
@@ -91,9 +93,8 @@ async def get_trending_tracks(limit: int = 8):
                 'id': track_id,
                 'title': metadata.get('title', 'Unknown'),
                 'artist': metadata.get('artist', 'Unknown'),
-                'preview_url': metadata.get('preview_url', ''),
-                'cover': metadata.get('cover', ''),
-                'rank': metadata.get('rank', 0)
+                'rank': metadata.get('rank', 0),
+                'cover': metadata.get('cover', '')
             })
 
         # Sort by popularity (rank descending)
@@ -102,7 +103,20 @@ async def get_trending_tracks(limit: int = 8):
         # Take top N tracks
         top_tracks = tracks[:limit]
 
-        logger.info(f"Returning {len(top_tracks)} trending tracks")
+        # Refresh preview URLs from Deezer API
+        for track in top_tracks:
+            try:
+                fresh_metadata = deezer_service.get_track_metadata(track['id'])
+                if fresh_metadata:
+                    track['preview_url'] = fresh_metadata.get('preview_url', '')
+                    # Update cover in case it changed
+                    if fresh_metadata.get('cover'):
+                        track['cover'] = fresh_metadata['cover']
+            except Exception as e:
+                logger.warning(f"Could not refresh metadata for track {track['id']}: {e}")
+                track['preview_url'] = ''
+
+        logger.info(f"Returning {len(top_tracks)} trending tracks with fresh URLs")
 
         return [TrackInfo(**track) for track in top_tracks]
 
