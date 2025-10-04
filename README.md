@@ -17,11 +17,12 @@ Repo pour le AI Dev Camp Mirego - Application de recommandation musicale par ana
   - librosa (analyse audio)
   - numpy/scipy (traitement signal)
 - **ML Model**:
-  - Hugging Face Transformers (audio embeddings)
-  - Modèle suggéré: `facebook/wav2vec2-base` ou `MIT/ast-finetuned-audioset`
-- **Similarity Search**:
-  - scikit-learn (cosine similarity)
-  - FAISS (pour optimisation si nécessaire)
+  - LAION CLAP (Contrastive Language-Audio Pretraining)
+  - Modèle: `music_audioset_epoch_15_esc_90.14.pt`
+- **Vector Database**:
+  - ChromaDB (base de données vectorielle pour recherche de similarité)
+  - Cosine similarity pour trouver les chansons similaires
+  - Base pré-calculée de 1000 chansons top Deezer
 
 ---
 
@@ -50,10 +51,14 @@ aider_camp/
 │   │   │   └── recommendations.py
 │   │   ├── services/
 │   │   │   ├── deezer_service.py
-│   │   │   ├── audio_analysis_service.py
-│   │   │   └── embedding_service.py
-│   │   └── models/
-│   │       └── schemas.py
+│   │   │   ├── embedding_service.py
+│   │   │   └── vector_db_service.py
+│   │   ├── models/
+│   │   │   └── schemas.py
+│   │   └── db/
+│   │       └── vector_store/  (ChromaDB data)
+│   ├── scripts/
+│   │   └── init_vector_db.py
 │   └── requirements.txt
 └── README.md
 ```
@@ -74,15 +79,16 @@ aider_camp/
    - Boutons: "Oui, continuer" / "Non, annuler"
 
 3. **Analyse audio** (si confirmé):
-   - Backend télécharge preview MP3 (30s)
-   - Preprocessing audio (librosa)
-   - Génération embedding via modèle HF
-   - Feature vector extrait
+   - Backend télécharge preview MP3 (30s) de la chanson recherchée
+   - Preprocessing audio (librosa → 48kHz)
+   - Génération embedding via modèle CLAP (512-dim)
+   - Feature vector normalisé
 
-4. **Recherche similaire**:
-   - Pré-filtrage: Embedding model HF sur catalogue Deezer
-   - Filtrage fin: Bibliothèque Python (librosa features + cosine similarity)
-   - Sélection top-3 tracks mélodiquement similaires
+4. **Recherche similaire** (via base vectorielle):
+   - Query de la base ChromaDB (1000 chansons pré-calculées)
+   - Recherche par cosine similarity → top 10 plus similaires
+   - Filtrage final par popularité (rank Deezer)
+   - Sélection des top 3 résultats finaux
 
 5. **Affichage résultats**:
    - 3 cards avec: cover, titre, artiste
@@ -108,16 +114,7 @@ Response: {
 }
 ```
 
-#### `POST /api/analyze`
-```json
-Request: { "track_id": "3135556" }
-Response: {
-  "status": "processing",
-  "message": "Analyse en cours..."
-}
-```
-
-#### `GET /api/recommendations/{track_id}`
+#### `POST /api/recommendations/{track_id}`
 ```json
 Response: [
   {
@@ -136,21 +133,21 @@ Response: [
 
 #### `DeezerService`
 - `search_tracks(query)` - Recherche par titre
-- `get_track_preview(track_id)` - Download audio 30s
+- `download_preview(preview_url)` - Download audio 30s
 - `get_track_metadata(track_id)` - Infos track
-
-#### `AudioAnalysisService`
-- `extract_features(audio_file)` - Librosa features:
-  - Spectral centroid
-  - Chroma features
-  - MFCC
-  - Tempo/beat
-  - Zero crossing rate
+- `get_top_tracks(total_count)` - Récupère top N chansons des charts
 
 #### `EmbeddingService`
-- `load_model()` - Charge modèle HF
-- `generate_embedding(audio_features)` - Vecteur embedding
+- `load_audio(audio_path)` - Charge et préprocesse audio (48kHz)
+- `generate_embedding(audio_path)` - Génère vecteur embedding CLAP (512-dim)
 - `calculate_similarity(embedding1, embedding2)` - Cosine similarity
+
+#### `VectorDBService`
+- `add_track(track_id, embedding, metadata)` - Ajoute une chanson
+- `bulk_add_tracks(track_ids, embeddings, metadatas)` - Ajout en batch
+- `query_similar(embedding, n_results)` - Trouve les N plus similaires
+- `track_exists(track_id)` - Vérifie si chanson existe
+- `count_tracks()` - Compte total de chansons
 
 ### Frontend - Composants
 
@@ -178,16 +175,71 @@ Response: [
 
 ## Pipeline d'analyse audio
 
-1. **Download**: MP3 30s depuis Deezer
-2. **Load**: librosa.load() → waveform + sample rate
+### Initialisation (une seule fois au démarrage)
+1. **Récupération top 1000**: Deezer API charts
+2. **Download batch**: 1000 previews MP3 (30s)
+3. **Génération embeddings**: CLAP sur chaque preview
+4. **Stockage**: ChromaDB avec métadonnées (title, artist, rank, preview_url, cover)
+
+### Recherche en temps réel (par requête utilisateur)
+1. **Download**: MP3 30s de la chanson recherchée
+2. **Load**: librosa.load() → waveform @ 48kHz
 3. **Preprocess**:
-   - Resample si nécessaire (16kHz pour modèles)
+   - Resample à 48kHz (requis par CLAP)
+   - Pad/trim à 10 secondes
    - Normalisation amplitude
-4. **Feature extraction**:
-   - Low-level: MFCC, spectral features
-   - High-level: Embedding model HF
-5. **Combine features**: Concat ou weighted average
-6. **Normalize**: L2 normalization pour cosine similarity
+4. **Embedding**: Modèle CLAP → vecteur 512-dim
+5. **Query vector DB**: ChromaDB cosine similarity → top 10
+6. **Filter**: Tri par popularité → top 3
+
+---
+
+## Initialisation de la base de données
+
+### Script: `scripts/init_vector_db.py`
+
+**Objectif**: Créer et peupler la base vectorielle avec les top 1000 chansons Deezer
+
+**Étapes**:
+1. Récupérer les top 1000 chansons via `DeezerService.get_top_tracks(1000)`
+2. Pour chaque chanson:
+   - Télécharger le preview audio (30s)
+   - Générer l'embedding avec `EmbeddingService.generate_embedding()`
+   - Stocker dans ChromaDB via `VectorDBService.add_track()`
+3. Gérer les erreurs (preview manquant, timeout, etc.)
+4. Logger la progression (ex: "Processed 250/1000 tracks")
+
+**Usage**:
+```bash
+python scripts/init_vector_db.py
+```
+
+**Note**: Ce script doit être exécuté une fois avant le premier lancement de l'application. La base peut ensuite être étendue via l'endpoint `/api/admin/add-tracks`.
+
+---
+
+## Extension de la base de données
+
+### Endpoint: `POST /api/admin/add-tracks`
+
+Permet d'ajouter de nouvelles chansons à la base vectorielle.
+
+```json
+Request: { "track_ids": ["123456", "789012"] }
+Response: {
+  "status": "success",
+  "added_count": 2,
+  "message": "2 tracks added to database"
+}
+```
+
+**Workflow**:
+1. Pour chaque `track_id`:
+   - Vérifier si déjà dans la DB
+   - Télécharger metadata + preview
+   - Générer embedding
+   - Ajouter à ChromaDB
+2. Retourner le nombre de chansons ajoutées
 
 ---
 
@@ -217,16 +269,30 @@ Response: [
 
 ### Python dependencies
 ```
-fastapi
-uvicorn
-librosa
-torch
-transformers
-numpy
-scipy
-scikit-learn
-requests
-python-multipart
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
+pydantic==2.9.2
+
+# Audio processing
+librosa==0.10.2
+soundfile==0.12.1
+
+# ML & Embeddings
+torch==2.5.1
+transformers==4.46.2
+laion-clap==1.1.4
+
+# Vector database
+chromadb==0.5.20
+
+# HTTP & API
+requests==2.32.3
+httpx==0.27.2
+
+# Utilities
+numpy==1.26.4
+scipy==1.14.1
+python-multipart==0.0.12
 ```
 
 ### React dependencies
@@ -243,11 +309,12 @@ react-query
 
 ## Points d'attention
 
-1. **Rate limiting Deezer**: Max 50 req/5sec
-2. **Latence embeddings**: Pré-calculer si possible
-3. **Storage audio**: Nettoyer files temporaires
+1. **Rate limiting Deezer**: Max 50 req/5sec → Batch downloads avec délai
+2. **Initialisation DB**: Première exécution peut prendre 30-60 min (1000 tracks)
+3. **Storage audio**: Nettoyer files temporaires après génération embeddings
 4. **CORS**: Configurer backend pour frontend
-5. **Modèle HF**: Choisir léger (< 500MB) pour rapidité
+5. **Modèle CLAP**: ~600MB → téléchargement automatique au premier lancement
+6. **ChromaDB**: Base persistante dans `backend/app/db/vector_store/`
 
 ---
 
@@ -257,6 +324,9 @@ react-query
 2. Backend retourne premier match Deezer
 3. Confirmation: "C'est bien ce morceau que vous voulez rechercher?" avec preview audio
 4. User play l'extrait et clique "Oui, continuer"
-5. Backend: analyse → embedding HF → filtrage librosa
-6. Retourne 3 tracks mélodiquement similaires (guitare acoustique/électrique, structure/tempo similaire)
-7. User voit 3 cards, peut play previews et (optionnel) save to Spotify
+5. Backend:
+   - Génère embedding CLAP du preview
+   - Query ChromaDB → top 10 similaires
+   - Filtre par popularité → top 3
+6. Retourne 3 tracks mélodiquement similaires
+7. User voit 3 cards avec preview audio jouable
