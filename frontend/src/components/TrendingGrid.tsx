@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
-import { Play, Pause } from 'lucide-react';
+﻿import { useState, useRef } from 'react';
+import { Play, Pause, Music2 } from 'lucide-react';
 import type { Track } from '../types/index';
 
 interface TrendingGridProps {
@@ -8,62 +8,41 @@ interface TrendingGridProps {
   isLoading?: boolean;
 }
 
+const FALLBACK_COVER = 'https://via.placeholder.com/300x300.png?text=No+Cover';
+
 export const TrendingGrid = ({ tracks, onTrackClick, isLoading = false }: TrendingGridProps) => {
   const [playingTrackId, setPlayingTrackId] = useState<string | null>(null);
-  const audioRefs = useRef<{ [key: string]: HTMLAudioElement }>({});
-
-  useEffect(() => {
-    // Create Audio objects for all tracks
-    tracks.forEach((track) => {
-      if (!audioRefs.current[track.id]) {
-        const audio = new Audio(track.preview_url);
-        audio.addEventListener('ended', () => setPlayingTrackId(null));
-        audioRefs.current[track.id] = audio;
-      }
-    });
-
-    // Cleanup on unmount
-    return () => {
-      Object.values(audioRefs.current).forEach((audio) => {
-        audio.pause();
-        audio.src = '';
-      });
-      audioRefs.current = {};
-    };
-  }, [tracks]);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const handlePlayPause = async (e: React.MouseEvent, track: Track) => {
     e.stopPropagation();
 
+    if (!track.preview_url) {
+      return;
+    }
+
     if (playingTrackId === track.id) {
-      // Pause current track
-      const audio = audioRefs.current[track.id];
-      if (audio) {
-        audio.pause();
-        setPlayingTrackId(null);
-      }
+      audioRef.current?.pause();
+      setPlayingTrackId(null);
     } else {
-      // Stop previous track if playing
-      if (playingTrackId && audioRefs.current[playingTrackId]) {
-        audioRefs.current[playingTrackId].pause();
-        audioRefs.current[playingTrackId].currentTime = 0;
+      if (audioRef.current) {
+        audioRef.current.pause();
       }
 
-      // Play new track
-      const audioElement = audioRefs.current[track.id];
-      if (audioElement) {
-        try {
-          await audioElement.play();
-          setPlayingTrackId(track.id);
-        } catch (error) {
-          console.error('Error playing audio:', error);
-          console.log('Track:', track.title, 'URL:', track.preview_url);
-        }
-      } else {
-        console.error('Audio element not found for track:', track.id);
+      const audio = new Audio(track.preview_url);
+      audioRef.current = audio;
+
+      try {
+        await audio.play();
+        setPlayingTrackId(track.id);
+        audio.onended = () => setPlayingTrackId(null);
+      } catch (error) {
+        console.error('Error playing audio:', error);
+        setPlayingTrackId(null);
       }
     }
   };
+
   if (isLoading) {
     return (
       <div className="w-full px-4 sm:px-8 md:px-12">
@@ -93,49 +72,54 @@ export const TrendingGrid = ({ tracks, onTrackClick, isLoading = false }: Trendi
         Essayez avec ces hits populaires
       </h2>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-6 max-w-3xl mx-auto">
-        {tracks.map((track) => (
-          <div
-            key={track.id}
-            className="group relative cursor-pointer transition-all duration-300 hover:scale-105"
-          >
-            {/* Album Cover */}
-            <div
-              className="relative aspect-square rounded-xl overflow-hidden shadow-lg"
-              onClick={() => onTrackClick(track.id, track.title)}
-            >
-              <img
-                src={track.cover}
-                alt={track.title}
-                className="w-full h-full object-cover"
-              />
+        {tracks.map((track) => {
+          const hasPreview = Boolean(track.preview_url);
+          const coverSrc = track.cover ?? FALLBACK_COVER;
 
-              {/* Overlay on hover */}
-              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                <button
-                  onClick={(e) => handlePlayPause(e, track)}
-                  className="w-12 h-12 rounded-full bg-gradient-to-r from-pink-500 to-purple-500 flex items-center justify-center shadow-lg hover:scale-110 transition-transform z-10"
-                >
-                  {playingTrackId === track.id ? (
-                    <Pause className="text-white" size={24} fill="white" />
-                  ) : (
-                    <Play className="text-white ml-1" size={24} fill="white" />
-                  )}
-                </button>
+          return (
+            <div
+              key={track.id}
+              className="group relative cursor-pointer transition-all duration-300 hover:scale-105"
+            >
+              <div
+                className="relative aspect-square rounded-xl overflow-hidden shadow-lg"
+                onClick={() => onTrackClick(track.id, track.title)}
+              >
+                {track.cover ? (
+                  <img src={coverSrc} alt={track.title} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-900 text-slate-400">
+                    <Music2 size={48} />
+                  </div>
+                )}
+
+                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                  <button
+                    onClick={(e) => handlePlayPause(e, track)}
+                    disabled={!hasPreview}
+                    className="w-12 h-12 rounded-full bg-gradient-to-r from-pink-500 to-purple-500 flex items-center justify-center shadow-lg hover:scale-110 transition-transform z-10 disabled:opacity-40"
+                    title={hasPreview ? 'Écouter un extrait' : 'Aucun extrait disponible'}
+                  >
+                    {playingTrackId === track.id ? (
+                      <Pause className="text-white" size={24} fill="white" />
+                    ) : (
+                      <Play className="text-white ml-1" size={24} fill="white" />
+                    )}
+                  </button>
+                </div>
+
+                <div className="absolute bottom-0 left-0 right-0 h-1/3 bg-gradient-to-t from-black/80 to-transparent"></div>
               </div>
 
-              {/* Gradient overlay at bottom */}
-              <div className="absolute bottom-0 left-0 right-0 h-1/3 bg-gradient-to-t from-black/80 to-transparent"></div>
+              <div className="mt-3 text-left">
+                <h3 className="text-sm font-semibold text-white truncate group-hover:text-pink-400 transition-colors">
+                  {track.title}
+                </h3>
+                <p className="text-xs text-gray-400 truncate">{track.artist}</p>
+              </div>
             </div>
-
-            {/* Track Info */}
-            <div className="mt-3 text-left">
-              <h3 className="text-sm font-semibold text-white truncate group-hover:text-pink-400 transition-colors">
-                {track.title}
-              </h3>
-              <p className="text-xs text-gray-400 truncate">{track.artist}</p>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

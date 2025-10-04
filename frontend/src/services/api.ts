@@ -1,5 +1,9 @@
-import axios from 'axios';
-import type { SearchResponse, Track } from '../types/index';
+﻿import axios from 'axios';
+import type {
+  SearchResponse,
+  Track,
+  VoiceIdentificationResponse,
+} from '../types/index';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -16,12 +20,45 @@ export const searchTrack = async (query: string): Promise<SearchResponse> => {
 };
 
 export const getRecommendations = async (trackId: string): Promise<Track[]> => {
-  const response = await api.post<{ tracks: Track[], source_track_id: string }>(`/api/recommendations/${trackId}`);
+  const response = await api.post<{ tracks: Track[]; source_track_id: string }>(
+    `/api/recommendations/${trackId}`,
+  );
   return response.data.tracks;
 };
 
 export const getTrendingTracks = async (limit: number = 8): Promise<Track[]> => {
   const response = await api.get<Track[]>(`/api/trending?limit=${limit}`);
+  return response.data;
+};
+
+interface VoicePayload {
+  audioBase64: string;
+  filename?: string;
+  similarCount?: number;
+  candidateLimit?: number;
+  hints?: string;
+}
+
+export const identifySongFromVoice = async (
+  payload: VoicePayload,
+): Promise<VoiceIdentificationResponse> => {
+  const body: Record<string, unknown> = {
+    audio_base64: payload.audioBase64,
+    similar_count: payload.similarCount ?? 3,
+    candidate_limit: payload.candidateLimit ?? 25,
+  };
+
+  if (payload.filename) {
+    body.filename = payload.filename;
+  }
+  if (payload.hints) {
+    body.hints = payload.hints;
+  }
+
+  const response = await api.post<VoiceIdentificationResponse>(
+    '/api/ai/identify/voice',
+    body,
+  );
   return response.data;
 };
 

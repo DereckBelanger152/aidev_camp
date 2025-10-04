@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+﻿import { useEffect, useRef, useState } from 'react';
 import { Play, Pause, Music2 } from 'lucide-react';
 import type { Track } from '../types/index';
 
@@ -10,30 +10,38 @@ export const ResultCard = ({ track }: ResultCardProps) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  const hasPreview = Boolean(track.preview_url);
+
   useEffect(() => {
-    // Create audio element
+    if (!hasPreview || !track.preview_url) {
+      audioRef.current = null;
+      setIsPlaying(false);
+      return;
+    }
+
     const audio = new Audio(track.preview_url);
     audioRef.current = audio;
 
-    // Handle audio end
     const handleEnded = () => setIsPlaying(false);
     audio.addEventListener('ended', handleEnded);
 
-    // Cleanup
     return () => {
       audio.pause();
       audio.removeEventListener('ended', handleEnded);
       audioRef.current = null;
     };
-  }, [track.preview_url]);
+  }, [track.preview_url, hasPreview]);
 
   const togglePlay = () => {
-    if (!audioRef.current) return;
+    const audio = audioRef.current;
+    if (!hasPreview || !audio) {
+      return;
+    }
 
     if (isPlaying) {
-      audioRef.current.pause();
+      audio.pause();
     } else {
-      audioRef.current.play();
+      void audio.play();
     }
     setIsPlaying(!isPlaying);
   };
@@ -44,15 +52,19 @@ export const ResultCard = ({ track }: ResultCardProps) => {
 
   return (
     <div className="glass rounded-2xl overflow-hidden group hover:scale-105 transition-all duration-300 neon-glow">
-      {/* Cover Image */}
       <div className="relative aspect-square overflow-hidden">
-        <img
-          src={track.cover}
-          alt={track.title}
-          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-        />
+        {track.cover ? (
+          <img
+            src={track.cover}
+            alt={track.title}
+            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-900 text-slate-400">
+            <Music2 size={64} />
+          </div>
+        )}
 
-        {/* Similarity Badge */}
         {track.similarity_score && (
           <div className="absolute top-3 right-3 bg-black/80 backdrop-blur-sm px-3 py-1 rounded-full border border-neon-cyan">
             <span className="text-neon-cyan font-bold text-sm">
@@ -61,30 +73,34 @@ export const ResultCard = ({ track }: ResultCardProps) => {
           </div>
         )}
 
-        {/* Play Button Overlay */}
-        <button
-          onClick={togglePlay}
-          className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-        >
-          <div className="w-16 h-16 flex items-center justify-center rounded-full bg-neon-cyan text-black hover:bg-neon-green transition-all duration-300 hover:scale-110">
-            {isPlaying ? <Pause size={28} /> : <Play size={28} className="ml-1" />}
+        {hasPreview ? (
+          <button
+            onClick={togglePlay}
+            className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+          >
+            <div className="w-16 h-16 flex items-center justify-center rounded-full bg-neon-cyan text-black hover:bg-neon-green transition-all duration-300 hover:scale-110">
+              {isPlaying ? <Pause size={28} /> : <Play size={28} className="ml-1" />}
+            </div>
+          </button>
+        ) : (
+          <div className="absolute inset-x-0 bottom-3 mx-auto w-max px-3 py-1 bg-black/60 text-xs text-gray-300 rounded-full">
+            Aperçu audio indisponible
           </div>
-        </button>
+        )}
       </div>
 
-      {/* Track Info */}
       <div className="p-5">
         <h3 className="text-xl font-bold text-white mb-1 truncate">{track.title}</h3>
         <p className="text-gray-400 mb-4 truncate">{track.artist}</p>
 
-        {/* Action Buttons */}
         <div className="flex gap-2">
           <button
             onClick={togglePlay}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-neon-purple to-neon-cyan rounded-lg font-semibold text-white hover:shadow-lg hover:shadow-neon-cyan/50 transition-all duration-300"
+            disabled={!hasPreview}
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-neon-purple to-neon-cyan rounded-lg font-semibold text-white hover:shadow-lg hover:shadow-neon-cyan/50 transition-all duration-300 disabled:opacity-40 disabled:hover:shadow-none"
           >
             {isPlaying ? <Pause size={16} /> : <Play size={16} />}
-            {isPlaying ? 'Pause' : 'Écouter'}
+            {hasPreview ? (isPlaying ? 'Pause' : 'Écouter') : 'Aperçu indispo.'}
           </button>
 
           <button

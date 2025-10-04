@@ -1,10 +1,11 @@
-export interface Track {
+﻿export interface Track {
   id: string;
   title: string;
   artist: string;
-  preview_url: string;
-  cover: string;
+  preview_url?: string | null;
+  cover?: string | null;
   similarity_score?: number;
+  confidence?: number;
 }
 
 export interface SearchResponse {
@@ -16,13 +17,17 @@ export interface SearchResponse {
   message: string;
 }
 
-export interface AnalysisResponse {
-  status: string;
-  message: string;
+export interface LLMSummary {
+  prompt: string;
+  response: string;
 }
 
-export interface RecommendationsResponse {
-  recommendations: Track[];
+export interface VoiceIdentificationResponse {
+  identified_track: Track;
+  similar_tracks: Track[];
+  llm_summary: LLMSummary;
+  transcription?: string;
+  voice_confidence?: number;
 }
 
 export type AppState = 'search' | 'confirmation' | 'analyzing' | 'results' | 'about';
