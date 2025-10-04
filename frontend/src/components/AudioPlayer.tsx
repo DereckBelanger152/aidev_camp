@@ -77,25 +77,25 @@ export const AudioPlayer = ({ url, className = '' }: AudioPlayerProps) => {
 
       <button
         onClick={togglePlay}
-        className="w-10 h-10 flex items-center justify-center rounded-full bg-neon-cyan text-black hover:bg-neon-green transition-all duration-300 neon-glow"
+        className="w-10 h-10 flex items-center justify-center rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-400 hover:to-pink-400 transition-all duration-300 shadow-lg shadow-purple-500/50"
       >
         {isPlaying ? <Pause size={20} /> : <Play size={20} className="ml-0.5" />}
       </button>
 
       <div className="flex-1 flex items-center gap-2">
-        <span className="text-xs text-gray-400 w-10">{formatTime(currentTime)}</span>
+        <span className="text-xs text-white font-medium w-10">{formatTime(currentTime)}</span>
 
         <div
           onClick={handleProgressClick}
-          className="flex-1 h-2 bg-gray-800 rounded-full cursor-pointer overflow-hidden group"
+          className="flex-1 h-2 bg-white/20 rounded-full cursor-pointer overflow-hidden group hover:bg-white/30 transition-colors"
         >
           <div
-            className="h-full bg-gradient-to-r from-neon-purple to-neon-cyan transition-all duration-100"
+            className="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-100"
             style={{ width: `${progress}%` }}
           />
         </div>
 
-        <span className="text-xs text-gray-400 w-10">{formatTime(duration)}</span>
+        <span className="text-xs text-white font-medium w-10">{formatTime(duration)}</span>
       </div>
     </div>
   );

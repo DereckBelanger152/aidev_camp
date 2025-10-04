@@ -17,7 +17,7 @@ export const SearchBar = ({ onSearch, isLoading = false }: SearchBarProps) => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="w-full max-w-2xl mx-auto">
+    <form onSubmit={handleSubmit} className="w-full max-w-2xl mx-auto mb-16">
       <div className="relative group">
         <div className="absolute inset-0 bg-gradient-to-r from-neon-purple via-neon-cyan to-neon-pink rounded-2xl opacity-75 blur-md group-hover:opacity-100 transition-opacity duration-300" />
 

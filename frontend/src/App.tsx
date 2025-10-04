@@ -1,17 +1,38 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { Navbar } from './components/Navbar';
 import { SearchBar } from './components/SearchBar';
 import { ConfirmationCard } from './components/ConfirmationCard';
 import { ResultsGrid } from './components/ResultsGrid';
+import { TrendingGrid } from './components/TrendingGrid';
 import type { Track, AppState } from './types/index';
-import { searchTrack, getRecommendations } from './services/api';
+import { searchTrack, getRecommendations, getTrendingTracks } from './services/api';
 import { Music2, Loader2 } from 'lucide-react';
 
 function App() {
   const [appState, setAppState] = useState<AppState>('search');
   const [confirmedTrack, setConfirmedTrack] = useState<Track | null>(null);
   const [recommendations, setRecommendations] = useState<Track[]>([]);
+  const [trendingTracks, setTrendingTracks] = useState<Track[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isTrendingLoading, setIsTrendingLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Fetch trending tracks on mount
+  useEffect(() => {
+    const fetchTrending = async () => {
+      setIsTrendingLoading(true);
+      try {
+        const tracks = await getTrendingTracks(8);
+        setTrendingTracks(tracks);
+      } catch (err) {
+        console.error('Failed to fetch trending tracks:', err);
+      } finally {
+        setIsTrendingLoading(false);
+      }
+    };
+
+    fetchTrending();
+  }, []);
 
   const handleSearch = async (query: string) => {
     setIsLoading(true);
@@ -66,22 +87,29 @@ function App() {
     setRecommendations([]);
     setAppState('search');
     setError(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleTrendingTrackClick = async (trackId: string, title: string) => {
+    await handleSearch(title);
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6">
-      {/* Header */}
-      <div className="mb-12 text-center animate-float">
-        <div className="flex items-center justify-center gap-3 mb-4">
-          <Music2 className="text-neon-cyan" size={48} />
-          <h1 className="text-5xl font-bold bg-gradient-to-r from-neon-cyan via-neon-purple to-neon-pink bg-clip-text text-transparent">
-            SoundMatch
-          </h1>
-        </div>
-        <p className="text-gray-400 text-lg">
-          Découvrez des sons mélodiquement similaires
-        </p>
-      </div>
+    <>
+      <Navbar />
+
+      <div className="min-h-screen flex flex-col items-center justify-center p-6 pt-28">
+        {/* Header - Only show on search page */}
+        {appState === 'search' && (
+          <div className="mb-8 text-center animate-float">
+            <h1 className="text-6xl font-bold mb-4 bg-gradient-to-r from-pink-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+              SoundTwin
+            </h1>
+            <p className="text-gray-400 text-lg">
+              Trouvez le jumeau sonore de votre chanson préférée 🎵
+            </p>
+          </div>
+        )}
 
       {/* Error Message */}
       {error && (
@@ -93,7 +121,14 @@ function App() {
       {/* Main Content */}
       <div className="w-full max-w-7xl">
         {appState === 'search' && (
-          <SearchBar onSearch={handleSearch} isLoading={isLoading} />
+          <>
+            <SearchBar onSearch={handleSearch} isLoading={isLoading} />
+            <TrendingGrid
+              tracks={trendingTracks}
+              onTrackClick={handleTrendingTrackClick}
+              isLoading={isTrendingLoading}
+            />
+          </>
         )}
 
         {appState === 'confirmation' && confirmedTrack && (
@@ -130,11 +165,12 @@ function App() {
         )}
       </div>
 
-      {/* Footer */}
-      <div className="mt-auto pt-12 text-center text-gray-600 text-sm">
-        <p>AI Dev Camp Mirego × Powered by Deezer API & HuggingFace</p>
+        {/* Footer */}
+        <div className="mt-auto pt-12 text-center text-gray-600 text-sm">
+          <p>AI Dev Camp Mirego × Powered by Deezer API & HuggingFace</p>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 

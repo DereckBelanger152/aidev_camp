@@ -20,4 +20,9 @@ export const getRecommendations = async (trackId: string): Promise<Track[]> => {
   return response.data.tracks;
 };
 
+export const getTrendingTracks = async (limit: number = 8): Promise<Track[]> => {
+  const response = await api.get<Track[]>(`/api/trending?limit=${limit}`);
+  return response.data;
+};
+
 export default api;

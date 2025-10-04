@@ -16,12 +16,18 @@ export const ConfirmationCard = ({
   isLoading = false,
 }: ConfirmationCardProps) => {
   return (
-    <div className="w-full max-w-2xl mx-auto animate-[fadeIn_0.5s_ease-in-out]">
-      <div className="glass rounded-3xl p-8 neon-glow">
-        <h2 className="text-2xl font-bold text-center mb-6 bg-gradient-to-r from-neon-cyan to-neon-purple bg-clip-text text-transparent">
-          C'est bien ce morceau que vous voulez rechercher?
+    <div className="w-full max-w-3xl mx-auto animate-[fadeIn_0.5s_ease-in-out]">
+      {/* Header Section */}
+      <div className="text-center mb-6">
+        <h2 className="text-4xl md:text-5xl font-bold mb-3 bg-gradient-to-r from-pink-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+          Vous parlez bien de ce chef d'œuvre?
         </h2>
+        <p className="text-gray-400 text-lg">
+          Écoutez l'extrait et confirmez que c'est bien la chanson que vous recherchez
+        </p>
+      </div>
 
+      <div className="glass rounded-3xl p-6 neon-glow">
         <div className="flex flex-col items-center gap-6">
           {/* Album Cover */}
           <div className="relative group">
@@ -29,7 +35,7 @@ export const ConfirmationCard = ({
             <img
               src={track.cover}
               alt={track.title}
-              className="relative w-64 h-64 object-cover rounded-2xl shadow-2xl"
+              className="relative w-48 h-48 object-cover rounded-2xl shadow-2xl"
             />
           </div>
 
@@ -49,7 +55,7 @@ export const ConfirmationCard = ({
             <button
               onClick={onCancel}
               disabled={isLoading}
-              className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-xl font-semibold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed border border-red-500/30"
+              className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 rounded-xl font-semibold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed border border-purple-500/30"
             >
               <X size={20} />
               Non, annuler
@@ -58,7 +64,7 @@ export const ConfirmationCard = ({
             <button
               onClick={onConfirm}
               disabled={isLoading}
-              className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-neon-green to-neon-cyan rounded-xl font-semibold text-black hover:shadow-lg hover:shadow-neon-green/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-pink-500 to-purple-500 rounded-xl font-semibold text-white hover:from-pink-400 hover:to-purple-400 hover:shadow-lg hover:shadow-pink-500/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Check size={20} />
               {isLoading ? 'Analyse en cours...' : 'Oui, continuer'}
