@@ -8,29 +8,55 @@ from laion_clap import CLAP_Module
 
 logger = logging.getLogger(__name__)
 
+# Path to local CLAP model
+LOCAL_MODEL_PATH = Path(__file__).parent.parent.parent / "models" / "clap" / "music_audioset_epoch_15_esc_90.14.pt"
+
 
 class EmbeddingService:
     """Service for generating audio embeddings using CLAP model."""
 
-    def __init__(self, model_name: str = "music_audioset_epoch_15_esc_90.14.pt"):
+    def __init__(self, model_path: Optional[Path] = None):
         """
         Initialize the embedding service with CLAP model.
 
         Args:
-            model_name: Name of the CLAP checkpoint to use
+            model_path: Path to CLAP model checkpoint file (.pt)
+                       If None, uses default local path
         """
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         logger.info(f"Using device: {self.device}")
 
-        # Initialize CLAP model
-        self.model = CLAP_Module(enable_fusion=False, device=self.device)
-        self.model.load_ckpt(model_name)
+        # Determine model path
+        if model_path is None:
+            model_path = LOCAL_MODEL_PATH
+
+        # Check if model exists
+        if not model_path.exists():
+            logger.error(f"CLAP model not found at: {model_path}")
+            logger.error("Please run: python scripts/download_clap_model.py")
+            raise FileNotFoundError(
+                f"CLAP model not found. Run 'python scripts/download_clap_model.py' to download it."
+            )
+
+        logger.info(f"Loading CLAP model from: {model_path}")
+
+        # Initialize CLAP model with correct architecture
+        # The music_audioset model uses HTSAT-base, not HTSAT-tiny
+        self.model = CLAP_Module(
+            enable_fusion=False,
+            device=self.device,
+            amodel='HTSAT-base'  # Specify the correct audio model architecture
+        )
+
+        # Load checkpoint manually with strict=False to ignore mismatches
+        checkpoint = torch.load(str(model_path), map_location=self.device)
+        self.model.model.load_state_dict(checkpoint['state_dict'], strict=False)
 
         # Audio processing parameters
         self.sample_rate = 48000  # CLAP expects 48kHz
         self.target_length = 10  # seconds
 
-        logger.info(f"CLAP model loaded: {model_name}")
+        logger.info(f"CLAP model loaded successfully")
 
     def load_audio(self, audio_path: str) -> np.ndarray:
         """

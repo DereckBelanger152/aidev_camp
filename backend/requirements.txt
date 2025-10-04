@@ -26,3 +26,4 @@ numpy==1.23.5  # Fixed by laion-clap requirement
 scipy==1.14.1
 python-multipart==0.0.12
 python-dotenv==1.0.1
+tqdm==4.66.1  # Progress bar for downloads
