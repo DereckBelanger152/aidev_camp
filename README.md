@@ -2,6 +2,11 @@
 
 Repo pour le AI Dev Camp Mirego - Application de recommandation musicale par analyse audio
 
+## Prérequis
+
+- **Python**: 3.10 ou 3.11 (requis pour torch, pydantic, laion-clap)
+- **Node.js**: 18+ (pour le frontend)
+
 ## Architecture générale
 
 ### Frontend
