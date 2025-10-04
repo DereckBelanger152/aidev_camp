@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """
-Script to initialize the vector database with top tracks from Deezer.
+Script to add songs to the vector database by search query.
 
 This script:
-1. Fetches top N tracks from Deezer charts
+1. Searches Deezer for tracks matching a query
 2. Downloads preview audio for each track
-3. Generates embeddings using OpenL3 model
+3. Generates embeddings using CLAP model
 4. Stores embeddings in ChromaDB
 
 Usage:
-    python scripts/init_vector_db.py [--count N] [--reset] [--resume]
+    python scripts/add_songs_by_query.py "artist name" --count 10
+    python scripts/add_songs_by_query.py "genre" --count 20 --skip-existing
 """
 
 import sys
@@ -34,17 +35,17 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def init_database(count: int = 1000, reset: bool = False, resume: bool = False):
+def add_songs_by_query(query: str, count: int = 10, skip_existing: bool = True):
     """
-    Initialize the vector database with top tracks.
+    Add songs matching a search query to the vector database.
 
     Args:
-        count: Number of tracks to index
-        reset: If True, reset database before initializing
-        resume: If True, skip already indexed tracks
+        query: Search query for Deezer
+        count: Number of tracks to add
+        skip_existing: If True, skip tracks that already exist in database
     """
     logger.info("=" * 60)
-    logger.info("Vector Database Initialization")
+    logger.info(f"Adding Songs by Query: '{query}'")
     logger.info("=" * 60)
 
     try:
@@ -54,35 +55,30 @@ def init_database(count: int = 1000, reset: bool = False, resume: bool = False):
         embedding_service = get_embedding_service()
         vector_db = get_vector_db_service()
 
-        # Reset if requested
-        if reset:
-            logger.warning("Resetting database...")
-            vector_db.reset_database()
-            logger.info("✓ Database reset complete")
-
-        # Check existing tracks
+        # Check database status
         existing_count = vector_db.count_tracks()
         logger.info(f"Current database size: {existing_count} tracks")
 
-        if existing_count >= count and not reset:
-            logger.info(f"Database already has {existing_count} tracks (target: {count})")
-            response = input("Continue anyway? (y/n): ")
-            if response.lower() != 'y':
-                logger.info("Initialization cancelled")
-                return
+        # Step 1: Search for tracks
+        logger.info(f"\nStep 1/3: Searching Deezer for '{query}'...")
+        logger.info(f"Fetching up to {count} tracks...\n")
 
-        # Step 1: Fetch top tracks from Deezer
-        logger.info(f"\nStep 1/3: Fetching top {count} tracks from Deezer...")
-        tracks = deezer_service.get_top_tracks(total_count=count)
-        logger.info(f"✓ Fetched {len(tracks)} tracks")
+        tracks = deezer_service.search_tracks(query, limit=count, return_all=True)
 
         if not tracks:
-            logger.error("No tracks fetched from Deezer. Aborting.")
+            logger.error(f"No tracks found for query: '{query}'")
             return
+
+        logger.info(f"✓ Found {len(tracks)} tracks")
+
+        # Display found tracks
+        logger.info("\nTracks found:")
+        for idx, track in enumerate(tracks, 1):
+            has_preview = "✓" if track.get('preview_url') else "✗"
+            logger.info(f"  {idx:2d}. {track['title']:<30} by {track['artist']:<20} [Preview: {has_preview}]")
 
         # Step 2: Process each track
         logger.info(f"\nStep 2/3: Processing {len(tracks)} tracks...")
-        logger.info("This may take 30-60 minutes depending on your connection\n")
 
         success_count = 0
         skip_count = 0
@@ -94,8 +90,8 @@ def init_database(count: int = 1000, reset: bool = False, resume: bool = False):
             track_id = track['id']
 
             try:
-                # Check if already exists (for resume functionality)
-                if resume and vector_db.track_exists(track_id):
+                # Check if already exists
+                if skip_existing and vector_db.track_exists(track_id):
                     logger.info(f"[{idx}/{len(tracks)}] Track {track_id} already exists, skipping")
                     skip_count += 1
                     continue
@@ -107,6 +103,7 @@ def init_database(count: int = 1000, reset: bool = False, resume: bool = False):
                     continue
 
                 # Download preview
+                logger.info(f"[{idx}/{len(tracks)}] Processing: {track['title']} by {track['artist']}")
                 audio_file = deezer_service.download_preview(track['preview_url'])
 
                 try:
@@ -128,18 +125,7 @@ def init_database(count: int = 1000, reset: bool = False, resume: bool = False):
                     )
 
                     success_count += 1
-
-                    # Progress logging
-                    if success_count % 10 == 0:
-                        elapsed = time.time() - start_time
-                        avg_time = elapsed / success_count
-                        remaining = (len(tracks) - idx) * avg_time
-
-                        logger.info(
-                            f"[{idx}/{len(tracks)}] Progress: {success_count} indexed, "
-                            f"{skip_count} skipped, {error_count} errors | "
-                            f"ETA: {remaining/60:.1f} min"
-                        )
+                    logger.info(f"[{idx}/{len(tracks)}] ✓ Added successfully")
 
                 finally:
                     # Cleanup audio file
@@ -150,60 +136,69 @@ def init_database(count: int = 1000, reset: bool = False, resume: bool = False):
                 time.sleep(0.1)
 
             except Exception as e:
-                logger.error(f"[{idx}/{len(tracks)}] Error processing track {track_id}: {e}")
+                logger.error(f"[{idx}/{len(tracks)}] ✗ Error processing track {track_id}: {e}")
                 error_count += 1
                 continue
 
         # Step 3: Summary
         total_time = time.time() - start_time
         logger.info("\n" + "=" * 60)
-        logger.info("Initialization Complete!")
+        logger.info("Operation Complete!")
         logger.info("=" * 60)
-        logger.info(f"✓ Successfully indexed: {success_count} tracks")
+        logger.info(f"Query: '{query}'")
+        logger.info(f"✓ Successfully added: {success_count} tracks")
         logger.info(f"⊘ Skipped: {skip_count} tracks")
         logger.info(f"✗ Errors: {error_count} tracks")
-        logger.info(f"Total time: {total_time/60:.1f} minutes")
-        logger.info(f"Average time per track: {total_time/success_count:.1f}s")
+        logger.info(f"Total time: {total_time:.1f} seconds")
+
+        if success_count > 0:
+            logger.info(f"Average time per track: {total_time/success_count:.1f}s")
+
         logger.info(f"\nFinal database size: {vector_db.count_tracks()} tracks")
         logger.info("=" * 60)
 
-        if success_count < count * 0.8:
-            logger.warning(
-                f"\n⚠️  Warning: Only {success_count}/{count} tracks indexed successfully. "
-                "This may affect recommendation quality."
-            )
-
     except KeyboardInterrupt:
-        logger.warning("\n\nInitialization interrupted by user")
+        logger.warning("\n\nOperation interrupted by user")
         logger.info(f"Current database size: {vector_db.count_tracks()} tracks")
-        logger.info("Run with --resume to continue from where you left off")
         sys.exit(1)
 
     except Exception as e:
-        logger.error(f"\n❌ Fatal error during initialization: {e}")
+        logger.error(f"\n❌ Fatal error: {e}")
         sys.exit(1)
 
 
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(
-        description="Initialize vector database with Deezer top tracks"
+        description="Add songs to vector database by search query",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  Add 10 songs by Queen:
+    python scripts/add_songs_by_query.py "Queen" --count 10
+
+  Add 20 rock songs:
+    python scripts/add_songs_by_query.py "rock" --count 20
+
+  Add songs without skipping existing:
+    python scripts/add_songs_by_query.py "jazz" --count 15 --no-skip-existing
+        """
+    )
+    parser.add_argument(
+        'query',
+        type=str,
+        help='Search query for Deezer (artist, song, genre, etc.)'
     )
     parser.add_argument(
         '--count',
         type=int,
-        default=1000,
-        help='Number of tracks to index (default: 1000)'
+        default=10,
+        help='Number of tracks to add (default: 10)'
     )
     parser.add_argument(
-        '--reset',
+        '--no-skip-existing',
         action='store_true',
-        help='Reset database before initializing'
-    )
-    parser.add_argument(
-        '--resume',
-        action='store_true',
-        help='Resume initialization, skip existing tracks'
+        help='Do not skip tracks that already exist in database'
     )
 
     args = parser.parse_args()
@@ -213,14 +208,14 @@ def main():
         logger.error("Count must be at least 1")
         sys.exit(1)
 
-    if args.count > 2000:
-        logger.warning(f"Large count ({args.count}) may take several hours")
+    if args.count > 100:
+        logger.warning(f"Large count ({args.count}) may take a while")
 
-    # Run initialization
-    init_database(
+    # Run operation
+    add_songs_by_query(
+        query=args.query,
         count=args.count,
-        reset=args.reset,
-        resume=args.resume
+        skip_existing=not args.no_skip_existing
     )
 
 

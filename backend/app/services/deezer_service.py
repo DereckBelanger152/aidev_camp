@@ -19,16 +19,36 @@ class DeezerService:
             'User-Agent': 'MusicRecommendationApp/1.0'
         })
 
-    def search_tracks(self, query: str, limit: int = 1) -> Optional[Dict]:
+    def _parse_track(self, track_data: Dict) -> Dict:
+        """
+        Parse raw track data from Deezer API.
+
+        Args:
+            track_data: Raw track data from API
+
+        Returns:
+            Standardized track dictionary
+        """
+        return {
+            'id': str(track_data['id']),
+            'title': track_data['title'],
+            'artist': track_data['artist']['name'],
+            'preview_url': track_data.get('preview'),
+            'cover': track_data['album'].get('cover_big') or track_data['album'].get('cover_medium'),
+            'rank': track_data.get('rank', 0)
+        }
+
+    def search_tracks(self, query: str, limit: int = 1, return_all: bool = False):
         """
         Search for tracks by name.
 
         Args:
             query: Search query (track name)
             limit: Maximum number of results
+            return_all: If True, return all results; if False, return first result only
 
         Returns:
-            First track found or None
+            Single track dict (return_all=False) or list of tracks (return_all=True) or None
         """
         try:
             url = f"{self.base_url}/search"
@@ -41,19 +61,14 @@ class DeezerService:
             response.raise_for_status()
 
             data = response.json()
+            tracks_data = data.get('data', [])
 
-            if data.get('data') and len(data['data']) > 0:
-                track = data['data'][0]
-                return {
-                    'id': str(track['id']),
-                    'title': track['title'],
-                    'artist': track['artist']['name'],
-                    'preview_url': track.get('preview'),
-                    'cover': track['album'].get('cover_big') or track['album'].get('cover_medium'),
-                    'rank': track.get('rank', 0)
-                }
+            if not tracks_data:
+                return [] if return_all else None
 
-            return None
+            tracks = [self._parse_track(track) for track in tracks_data]
+
+            return tracks if return_all else tracks[0]
 
         except Exception as e:
             logger.error(f"Error searching tracks: {e}")
