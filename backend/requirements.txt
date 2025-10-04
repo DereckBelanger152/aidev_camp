@@ -10,6 +10,7 @@ audioread==3.0.1
 
 # ML & Embeddings
 torch==2.5.1
+torchvision==0.20.1
 transformers==4.46.2
 laion-clap==1.1.4
 
