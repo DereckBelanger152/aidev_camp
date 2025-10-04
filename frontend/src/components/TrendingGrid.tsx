@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Play, Pause } from 'lucide-react';
 import type { Track } from '../types/index';
 
@@ -12,13 +12,36 @@ export const TrendingGrid = ({ tracks, onTrackClick, isLoading = false }: Trendi
   const [playingTrackId, setPlayingTrackId] = useState<string | null>(null);
   const audioRefs = useRef<{ [key: string]: HTMLAudioElement }>({});
 
-  const handlePlayPause = (e: React.MouseEvent, track: Track) => {
+  useEffect(() => {
+    // Create Audio objects for all tracks
+    tracks.forEach((track) => {
+      if (!audioRefs.current[track.id]) {
+        const audio = new Audio(track.preview_url);
+        audio.addEventListener('ended', () => setPlayingTrackId(null));
+        audioRefs.current[track.id] = audio;
+      }
+    });
+
+    // Cleanup on unmount
+    return () => {
+      Object.values(audioRefs.current).forEach((audio) => {
+        audio.pause();
+        audio.src = '';
+      });
+      audioRefs.current = {};
+    };
+  }, [tracks]);
+
+  const handlePlayPause = async (e: React.MouseEvent, track: Track) => {
     e.stopPropagation();
 
     if (playingTrackId === track.id) {
       // Pause current track
-      audioRefs.current[track.id]?.pause();
-      setPlayingTrackId(null);
+      const audio = audioRefs.current[track.id];
+      if (audio) {
+        audio.pause();
+        setPlayingTrackId(null);
+      }
     } else {
       // Stop previous track if playing
       if (playingTrackId && audioRefs.current[playingTrackId]) {
@@ -26,13 +49,18 @@ export const TrendingGrid = ({ tracks, onTrackClick, isLoading = false }: Trendi
         audioRefs.current[playingTrackId].currentTime = 0;
       }
 
-      // Play new track from audio element in DOM
+      // Play new track
       const audioElement = audioRefs.current[track.id];
       if (audioElement) {
-        audioElement.play().catch((error) => {
+        try {
+          await audioElement.play();
+          setPlayingTrackId(track.id);
+        } catch (error) {
           console.error('Error playing audio:', error);
-        });
-        setPlayingTrackId(track.id);
+          console.log('Track:', track.title, 'URL:', track.preview_url);
+        }
+      } else {
+        console.error('Audio element not found for track:', track.id);
       }
     }
   };
@@ -70,15 +98,6 @@ export const TrendingGrid = ({ tracks, onTrackClick, isLoading = false }: Trendi
             key={track.id}
             className="group relative cursor-pointer transition-all duration-300 hover:scale-105"
           >
-            {/* Hidden audio element */}
-            <audio
-              ref={(el) => {
-                if (el) audioRefs.current[track.id] = el;
-              }}
-              src={track.preview_url}
-              onEnded={() => setPlayingTrackId(null)}
-            />
-
             {/* Album Cover */}
             <div
               className="relative aspect-square rounded-xl overflow-hidden shadow-lg"

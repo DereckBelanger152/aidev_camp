@@ -107,7 +107,6 @@ async def get_recommendations(
                 'artist': metadata.get('artist', 'Unknown'),
                 'similarity_score': round(similarity_score, 3),
                 'popularity': metadata.get('rank', 0),
-                'preview_url': metadata.get('preview_url'),
                 'cover': metadata.get('cover')
             })
 
@@ -117,7 +116,21 @@ async def get_recommendations(
         # Take top 3
         top_3 = recommendations[:3]
 
-        logger.info(f"Returning {len(top_3)} recommendations")
+        # Refresh preview URLs from Deezer API
+        logger.info("Refreshing preview URLs from Deezer...")
+        for rec in top_3:
+            try:
+                fresh_metadata = deezer_service.get_track_metadata(rec['id'])
+                if fresh_metadata:
+                    rec['preview_url'] = fresh_metadata.get('preview_url', '')
+                    # Update cover in case it changed
+                    if fresh_metadata.get('cover'):
+                        rec['cover'] = fresh_metadata['cover']
+            except Exception as e:
+                logger.warning(f"Could not refresh metadata for track {rec['id']}: {e}")
+                rec['preview_url'] = ''
+
+        logger.info(f"Returning {len(top_3)} recommendations with fresh URLs")
 
         return RecommendationResponse(
             tracks=[RecommendationTrack(**track) for track in top_3],
@@ -127,7 +140,7 @@ async def get_recommendations(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting recommendations: {e}")
+        logger.error(f"Error getting recommendations: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
             detail=f"Error generating recommendations: {str(e)}"

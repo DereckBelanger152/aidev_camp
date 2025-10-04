@@ -156,15 +156,15 @@ function App() {
 
         {appState === 'results' && (
           <>
-            <ResultsGrid tracks={recommendations} />
-            <div className="text-center mt-8">
+            <div className="text-center mb-8">
               <button
                 onClick={handleNewSearch}
-                className="px-8 py-3 bg-gradient-to-r from-neon-purple to-neon-cyan rounded-xl font-semibold text-white hover:shadow-lg hover:shadow-neon-cyan/50 transition-all duration-300"
+                className="px-10 py-4 bg-gradient-to-r from-pink-500 to-purple-500 rounded-xl font-bold text-white text-lg hover:shadow-2xl hover:shadow-pink-500/50 transition-all duration-300 hover:scale-105"
               >
-                Nouvelle recherche
+                ← Nouvelle recherche
               </button>
             </div>
+            <ResultsGrid tracks={recommendations} />
           </>
         )}
       </div>

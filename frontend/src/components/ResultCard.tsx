@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Play, Pause, Music2 } from 'lucide-react';
 import type { Track } from '../types/index';
 
@@ -8,13 +8,32 @@ interface ResultCardProps {
 
 export const ResultCard = ({ track }: ResultCardProps) => {
   const [isPlaying, setIsPlaying] = useState(false);
-  const [audio] = useState(new Audio(track.preview_url));
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    // Create audio element
+    const audio = new Audio(track.preview_url);
+    audioRef.current = audio;
+
+    // Handle audio end
+    const handleEnded = () => setIsPlaying(false);
+    audio.addEventListener('ended', handleEnded);
+
+    // Cleanup
+    return () => {
+      audio.pause();
+      audio.removeEventListener('ended', handleEnded);
+      audioRef.current = null;
+    };
+  }, [track.preview_url]);
 
   const togglePlay = () => {
+    if (!audioRef.current) return;
+
     if (isPlaying) {
-      audio.pause();
+      audioRef.current.pause();
     } else {
-      audio.play();
+      audioRef.current.play();
     }
     setIsPlaying(!isPlaying);
   };
