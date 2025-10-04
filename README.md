@@ -1,16 +1,18 @@
-# aider_camp
+# aidev_camp
 
 Repo pour le AI Dev Camp Mirego - Application de recommandation musicale par analyse audio
 
 ## Architecture générale
 
 ### Frontend
+
 - **Framework**: React avec TypeScript
 - **UI Library**: Tailwind CSS + shadcn/ui pour les composants
 - **Lecteur audio**: HTML5 Audio API ou Howler.js
 - **État**: React Context ou Zustand
 
 ### Backend
+
 - **Framework**: FastAPI (Python)
 - **API Integration**: Deezer API
 - **Audio Processing**:
@@ -68,23 +70,27 @@ aider_camp/
 ## Flux de données
 
 1. **Recherche initiale**:
+
    - User entre titre exact (recherche stricte, aucune faute permise)
    - Frontend envoie query tel quel → Backend → Deezer API
    - Backend retourne premier résultat exact
 
 2. **Confirmation**:
+
    - Backend répond: "C'est bien ce morceau que vous voulez rechercher?"
    - Affiche: titre, artiste, cover, preview audio (30s)
    - User peut play l'extrait pour confirmer
    - Boutons: "Oui, continuer" / "Non, annuler"
 
 3. **Analyse audio** (si confirmé):
+
    - Backend télécharge preview MP3 (30s) de la chanson recherchée
    - Preprocessing audio (librosa → 48kHz)
    - Génération embedding via modèle CLAP (512-dim)
    - Feature vector normalisé
 
 4. **Recherche similaire** (via base vectorielle):
+
    - Query de la base ChromaDB (1000 chansons pré-calculées)
    - Recherche par cosine similarity → top 10 plus similaires
    - Filtrage final par popularité (rank Deezer)
@@ -102,6 +108,7 @@ aider_camp/
 ### Backend - Endpoints
 
 #### `POST /api/search`
+
 ```json
 Request: { "query": "Bohemian Rhapsody" }
 Response: {
@@ -115,6 +122,7 @@ Response: {
 ```
 
 #### `POST /api/recommendations/{track_id}`
+
 ```json
 Response: [
   {
@@ -132,17 +140,20 @@ Response: [
 ### Backend - Services
 
 #### `DeezerService`
+
 - `search_tracks(query)` - Recherche par titre
 - `download_preview(preview_url)` - Download audio 30s
 - `get_track_metadata(track_id)` - Infos track
 - `get_top_tracks(total_count)` - Récupère top N chansons des charts
 
 #### `EmbeddingService`
+
 - `load_audio(audio_path)` - Charge et préprocesse audio (48kHz)
 - `generate_embedding(audio_path)` - Génère vecteur embedding CLAP (512-dim)
 - `calculate_similarity(embedding1, embedding2)` - Cosine similarity
 
 #### `VectorDBService`
+
 - `add_track(track_id, embedding, metadata)` - Ajoute une chanson
 - `bulk_add_tracks(track_ids, embeddings, metadatas)` - Ajout en batch
 - `query_similar(embedding, n_results)` - Trouve les N plus similaires
@@ -152,22 +163,26 @@ Response: [
 ### Frontend - Composants
 
 #### `SearchBar`
+
 - Input simple (pas de debounce)
 - Submit direct au backend
 - Pas de suggestions
 
 #### `ConfirmationCard`
+
 - Affiche track trouvé: cover, titre, artiste
 - Message: "C'est bien ce morceau que vous voulez rechercher?"
 - Audio player intégré (preview 30s)
 - Boutons: "Oui, continuer" / "Non, annuler"
 
 #### `ResultCard`
+
 - Affiche: cover, titre, artiste
 - Play button pour preview (30s)
 - Button "Save to Spotify" (placeholder)
 
 #### `ResultsGrid`
+
 - Grid de 3 cards
 - Layout responsive
 
@@ -176,12 +191,14 @@ Response: [
 ## Pipeline d'analyse audio
 
 ### Initialisation (une seule fois au démarrage)
+
 1. **Récupération top 1000**: Deezer API charts
 2. **Download batch**: 1000 previews MP3 (30s)
 3. **Génération embeddings**: CLAP sur chaque preview
 4. **Stockage**: ChromaDB avec métadonnées (title, artist, rank, preview_url, cover)
 
 ### Recherche en temps réel (par requête utilisateur)
+
 1. **Download**: MP3 30s de la chanson recherchée
 2. **Load**: librosa.load() → waveform @ 48kHz
 3. **Preprocess**:
@@ -201,6 +218,7 @@ Response: [
 **Objectif**: Créer et peupler la base vectorielle avec les top 1000 chansons Deezer
 
 **Étapes**:
+
 1. Récupérer les top 1000 chansons via `DeezerService.get_top_tracks(1000)`
 2. Pour chaque chanson:
    - Télécharger le preview audio (30s)
@@ -210,6 +228,7 @@ Response: [
 4. Logger la progression (ex: "Processed 250/1000 tracks")
 
 **Usage**:
+
 ```bash
 python scripts/init_vector_db.py
 ```
@@ -234,6 +253,7 @@ Response: {
 ```
 
 **Workflow**:
+
 1. Pour chaque `track_id`:
    - Vérifier si déjà dans la DB
    - Télécharger metadata + preview
@@ -246,18 +266,21 @@ Response: {
 ## Optimisations Hackathon
 
 ### Phase 1 (MVP - 4h)
+
 - Backend: Deezer API + librosa features uniquement (skip HF initialement)
 - Frontend: SearchBar → ConfirmationCard → ResultsGrid (3 cards)
 - Similarity: Cosine sur MFCC + spectral features
 - Flow complet: recherche → confirmation → analyse → 3 résultats
 
 ### Phase 2 (Enhancement - 2h)
+
 - Intégrer modèle HF pour embeddings (amélioration similarité)
 - Améliorer UI/UX (animations, transitions)
 - Cache embeddings calculés
 - Gestion erreurs robuste
 
 ### Phase 3 (Polish - 1-2h)
+
 - Loading states élégants
 - Placeholder "Save to Spotify" (si temps)
 - Polish visuel final
@@ -268,6 +291,7 @@ Response: {
 ## Stack technique détaillée
 
 ### Python dependencies
+
 ```
 fastapi==0.115.0
 uvicorn[standard]==0.32.0
@@ -296,6 +320,7 @@ python-multipart==0.0.12
 ```
 
 ### React dependencies
+
 ```
 react
 typescript
