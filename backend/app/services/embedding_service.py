@@ -49,7 +49,15 @@ class EmbeddingService:
         )
 
         # Load checkpoint manually with strict=False to ignore mismatches
-        checkpoint = torch.load(str(model_path), map_location=self.device)
+        try:
+            checkpoint = torch.load(
+                str(model_path),
+                map_location=self.device,
+                weights_only=False,
+            )
+        except TypeError:
+            # PyTorch < 2.6 does not support weights_only argument
+            checkpoint = torch.load(str(model_path), map_location=self.device)
         self.model.model.load_state_dict(checkpoint['state_dict'], strict=False)
 
         # Audio processing parameters
