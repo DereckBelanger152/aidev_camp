@@ -71,9 +71,9 @@ def init_database(count: int = 1000, reset: bool = False, resume: bool = False):
                 logger.info("Initialization cancelled")
                 return
 
-        # Step 1: Fetch top tracks from Deezer
-        logger.info(f"\nStep 1/3: Fetching top {count} tracks from Deezer...")
-        tracks = deezer_service.get_top_tracks(total_count=count)
+        # Step 1: Fetch random tracks from Deezer
+        logger.info(f"\nStep 1/3: Fetching {count} random tracks from Deezer...")
+        tracks = deezer_service.get_random_tracks(total_count=count)
         logger.info(f"✓ Fetched {len(tracks)} tracks")
 
         if not tracks:

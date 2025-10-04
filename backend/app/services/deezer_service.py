@@ -1,5 +1,6 @@
 import requests
 import logging
+import random
 from typing import Optional, Dict, List
 from pathlib import Path
 import tempfile
@@ -211,6 +212,92 @@ class DeezerService:
 
             logger.info(f"Fetched {len(all_tracks)}/{total_count} tracks")
 
+        return all_tracks[:total_count]
+
+    def get_random_tracks(self, total_count: int = 1000) -> List[Dict]:
+        """
+        Get random tracks from Deezer using various search strategies.
+
+        Args:
+            total_count: Total number of tracks to fetch
+
+        Returns:
+            List of track metadata
+        """
+        all_tracks = []
+        seen_ids = set()
+
+        # Common search terms for diversity
+        search_terms = [
+            'a', 'e', 'i', 'o', 'u', 'the', 'love', 'you', 'me', 'we',
+            'rock', 'pop', 'jazz', 'blues', 'soul', 'rap', 'dance', 'house',
+            'night', 'day', 'time', 'life', 'heart', 'dream', 'fire', 'water',
+            'summer', 'winter', 'rain', 'sun', 'moon', 'star', 'light', 'dark'
+        ]
+
+        logger.info(f"Fetching {total_count} random tracks...")
+
+        attempts = 0
+        max_attempts = total_count * 3  # Prevent infinite loops
+
+        while len(all_tracks) < total_count and attempts < max_attempts:
+            attempts += 1
+
+            # Pick random search term
+            term = random.choice(search_terms)
+
+            # Random offset to get different results
+            random_offset = random.randint(0, 900)
+
+            try:
+                url = f"{self.base_url}/search"
+                params = {
+                    'q': term,
+                    'limit': 50,
+                    'index': random_offset
+                }
+
+                response = self.session.get(url, params=params)
+                response.raise_for_status()
+
+                data = response.json()
+                tracks_data = data.get('data', [])
+
+                # Shuffle the results
+                random.shuffle(tracks_data)
+
+                for track_data in tracks_data:
+                    if len(all_tracks) >= total_count:
+                        break
+
+                    track_id = str(track_data['id'])
+
+                    # Skip duplicates
+                    if track_id in seen_ids:
+                        continue
+
+                    seen_ids.add(track_id)
+
+                    track = {
+                        'id': track_id,
+                        'title': track_data['title'],
+                        'artist': track_data['artist']['name'],
+                        'preview_url': track_data.get('preview'),
+                        'cover': track_data['album'].get('cover_big') or track_data['album'].get('cover_medium'),
+                        'rank': track_data.get('rank', 0),
+                        'position': len(all_tracks)
+                    }
+
+                    all_tracks.append(track)
+
+                if len(all_tracks) % 50 == 0:
+                    logger.info(f"Fetched {len(all_tracks)}/{total_count} random tracks")
+
+            except Exception as e:
+                logger.warning(f"Error fetching random tracks: {e}")
+                continue
+
+        logger.info(f"Fetched {len(all_tracks)} unique random tracks")
         return all_tracks[:total_count]
 
 

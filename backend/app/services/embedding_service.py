@@ -22,12 +22,12 @@ class EmbeddingService:
         logger.info("Initializing OpenL3 embedding service...")
 
         # OpenL3 configuration
-        self.input_repr = "mel128"  # Mel-spectrogram representation (faster than mel256)
+        self.input_repr = "mel256"  # Mel-spectrogram representation (higher resolution)
         self.content_type = "music"  # Music-specific model
         self.embedding_size = 512  # 512-dimensional embeddings
-        self.hop_size = 1.0  # Hop size in seconds (1s = faster, 0.1s = more frames)
+        self.hop_size = 0.5  # Hop size in seconds
         self.sample_rate = 48000  # Target sample rate
-        self.center_crop_duration = 15.0  # Process only 15s from center (faster)
+        self.center_crop_duration = 15.0  # Process 5s from center (balance: speed vs quality)
 
         # Load OpenL3 model
         self.model = openl3.models.load_audio_embedding_model(
@@ -75,32 +75,36 @@ class EmbeddingService:
             hop_size=self.hop_size
         )
 
-        # Aggregate frame-level embeddings by taking the mean
-        # This gives us a single 512-dimensional vector for the entire audio
-        embedding_aggregated = np.mean(embeddings, axis=0)
+        # Aggregate frame-level embeddings
+        # Normalize each frame FIRST, then aggregate
+        # This preserves directional information better
+        embeddings_normalized = embeddings / np.linalg.norm(embeddings, axis=1, keepdims=True)
 
-        # Normalize to unit length
-        embedding_normalized = embedding_aggregated / np.linalg.norm(embedding_aggregated)
+        # Take mean of normalized embeddings
+        embedding_mean = np.mean(embeddings_normalized, axis=0)
 
-        return embedding_normalized
+        # Normalize again to unit length
+        embedding_final = embedding_mean / np.linalg.norm(embedding_mean)
+
+        return embedding_final
 
     def calculate_similarity(self, embedding1: np.ndarray, embedding2: np.ndarray) -> float:
         """
         Calculate cosine similarity between two embeddings.
 
         Args:
-            embedding1: First embedding vector
-            embedding2: Second embedding vector
+            embedding1: First embedding vector (already normalized)
+            embedding2: Second embedding vector (already normalized)
 
         Returns:
             Cosine similarity score (0-1)
         """
         try:
-            # Cosine similarity
-            similarity = np.dot(embedding1, embedding2) / (
-                np.linalg.norm(embedding1) * np.linalg.norm(embedding2)
-            )
-            return float(similarity)
+            # Since embeddings are already normalized, cosine similarity = dot product
+            similarity = np.dot(embedding1, embedding2)
+
+            # Clip to [0, 1] range
+            return float(np.clip(similarity, 0, 1))
 
         except Exception as e:
             logger.error("Error calculating similarity: %s", e)
