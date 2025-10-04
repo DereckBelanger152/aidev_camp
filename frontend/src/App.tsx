@@ -5,6 +5,7 @@ import { ConfirmationCard } from './components/ConfirmationCard';
 import { ResultsGrid } from './components/ResultsGrid';
 import { TrendingGrid } from './components/TrendingGrid';
 import { AudioWaves } from './components/AudioWaves';
+import { About } from './components/About';
 import type { Track, AppState } from './types/index';
 import { searchTrack, getRecommendations, getTrendingTracks } from './services/api';
 import { Music2, Loader2 } from 'lucide-react';
@@ -95,9 +96,20 @@ function App() {
     await handleSearch(title);
   };
 
+  const handleNavigation = (page: 'home' | 'about') => {
+    if (page === 'home') {
+      setAppState('search');
+      setConfirmedTrack(null);
+      setRecommendations([]);
+      setError(null);
+    } else if (page === 'about') {
+      setAppState('about');
+    }
+  };
+
   return (
     <>
-      <Navbar />
+      <Navbar onNavigate={handleNavigation} />
 
       {/* Audio wave visualizer across full page */}
       <AudioWaves />
@@ -166,6 +178,10 @@ function App() {
             </div>
             <ResultsGrid tracks={recommendations} />
           </>
+        )}
+
+        {appState === 'about' && (
+          <About />
         )}
       </div>
 

@@ -25,4 +25,4 @@ export interface RecommendationsResponse {
   recommendations: Track[];
 }
 
-export type AppState = 'search' | 'confirmation' | 'analyzing' | 'results';
+export type AppState = 'search' | 'confirmation' | 'analyzing' | 'results' | 'about';

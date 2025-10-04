@@ -1,12 +1,27 @@
 import { useState } from 'react';
 import { Music2, Home, Info, Menu, X } from 'lucide-react';
 
-export const Navbar = () => {
+interface NavbarProps {
+  onNavigate?: (page: 'home' | 'about') => void;
+}
+
+export const Navbar = ({ onNavigate }: NavbarProps) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const handleHomeClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
     e.preventDefault();
-    window.location.reload();
+    if (onNavigate) {
+      onNavigate('home');
+    } else {
+      window.location.reload();
+    }
+  };
+
+  const handleAboutClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    if (onNavigate) {
+      onNavigate('about');
+    }
   };
 
   return (
@@ -35,6 +50,7 @@ export const Navbar = () => {
             </a>
             <a
               href="#"
+              onClick={handleAboutClick}
               className="flex items-center gap-2 text-white hover:text-pink-400 transition-colors duration-300"
             >
               <Info size={20} />
@@ -69,7 +85,10 @@ export const Navbar = () => {
             <a
               href="#"
               className="flex items-center gap-2 text-white hover:text-pink-400 transition-colors duration-300 py-2"
-              onClick={() => setIsMenuOpen(false)}
+              onClick={(e) => {
+                handleAboutClick(e);
+                setIsMenuOpen(false);
+              }}
             >
               <Info size={20} />
               <span className="font-medium">À propos</span>
