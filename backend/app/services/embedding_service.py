@@ -1,10 +1,13 @@
-import torch
-import librosa
-import numpy as np
-from pathlib import Path
+"""
+Audio embedding service using OpenL3.
+"""
+
 import logging
 from typing import Optional
-from laion_clap import CLAP_Module
+
+import numpy as np
+import librosa
+import openl3
 
 logger = logging.getLogger(__name__)
 
@@ -13,140 +16,102 @@ LOCAL_MODEL_PATH = Path(__file__).parent.parent.parent / "models" / "clap" / "mu
 
 
 class EmbeddingService:
-    """Service for generating audio embeddings using CLAP model."""
+    """Service for generating audio embeddings using OpenL3."""
 
-    def __init__(self, model_path: Optional[Path] = None):
+    def __init__(self):
         """
-        Initialize the embedding service with CLAP model.
-
-        Args:
-            model_path: Path to CLAP model checkpoint file (.pt)
-                       If None, uses default local path
+        Initialize the embedding service with OpenL3.
         """
-        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        logger.info(f"Using device: {self.device}")
+        logger.info("Initializing OpenL3 embedding service...")
 
-        # Determine model path
-        if model_path is None:
-            model_path = LOCAL_MODEL_PATH
+        # OpenL3 configuration
+        self.input_repr = "mel256"  # Mel-spectrogram representation (higher resolution)
+        self.content_type = "music"  # Music-specific model
+        self.embedding_size = 512  # 512-dimensional embeddings
+        self.hop_size = 0.5  # Hop size in seconds
+        self.sample_rate = 48000  # Target sample rate
+        self.center_crop_duration = 15.0  # Process 5s from center (balance: speed vs quality)
 
-        # Check if model exists
-        if not model_path.exists():
-            logger.error(f"CLAP model not found at: {model_path}")
-            logger.error("Please run: python scripts/download_clap_model.py")
-            raise FileNotFoundError(
-                f"CLAP model not found. Run 'python scripts/download_clap_model.py' to download it."
-            )
-
-        logger.info(f"Loading CLAP model from: {model_path}")
-
-        # Initialize CLAP model with correct architecture
-        # The music_audioset model uses HTSAT-base, not HTSAT-tiny
-        self.model = CLAP_Module(
-            enable_fusion=False,
-            device=self.device,
-            amodel='HTSAT-base'  # Specify the correct audio model architecture
+        # Load OpenL3 model
+        self.model = openl3.models.load_audio_embedding_model(
+            input_repr=self.input_repr,
+            content_type=self.content_type,
+            embedding_size=self.embedding_size
         )
 
-        # Load checkpoint manually with strict=False to ignore mismatches
-        try:
-            checkpoint = torch.load(
-                str(model_path),
-                map_location=self.device,
-                weights_only=False,
-            )
-        except TypeError:
-            # PyTorch < 2.6 does not support weights_only argument
-            checkpoint = torch.load(str(model_path), map_location=self.device)
-        self.model.model.load_state_dict(checkpoint['state_dict'], strict=False)
+        logger.info("OpenL3 model loaded successfully (music, 512-dim)")
 
-        # Audio processing parameters
-        self.sample_rate = 48000  # CLAP expects 48kHz
-        self.target_length = 10  # seconds
-
-        logger.info(f"CLAP model loaded successfully")
-
-    def load_audio(self, audio_path: str) -> np.ndarray:
+    def generate_embedding(self, audio_path: str, target_sr: int = 48000) -> np.ndarray:
         """
-        Load and preprocess audio file.
+        Generates an OpenL3 embedding for a given audio file.
 
         Args:
-            audio_path: Path to audio file
+            audio_path: path to an audio file (ideally ~30s clip)
+            target_sr: sample rate for the model (default: 48000)
 
         Returns:
-            Preprocessed audio array
+            np.ndarray: normalized embedding vector (1D)
         """
-        try:
-            # Load audio with librosa
-            audio, sr = librosa.load(audio_path, sr=self.sample_rate, mono=True)
+        # Load audio with librosa
+        audio, sr = librosa.load(audio_path, sr=target_sr, mono=True)
 
-            # Pad or trim to target length
-            target_samples = self.sample_rate * self.target_length
-            if len(audio) < target_samples:
-                # Pad with zeros
-                audio = np.pad(audio, (0, target_samples - len(audio)))
-            else:
-                # Trim to target length
-                audio = audio[:target_samples]
+        # Center crop for speed (take 15s from middle instead of full 30s)
+        audio_duration = len(audio) / sr
+        if audio_duration > self.center_crop_duration:
+            # Calculate center crop indices
+            crop_samples = int(self.center_crop_duration * sr)
+            center = len(audio) // 2
+            start = center - crop_samples // 2
+            end = start + crop_samples
+            audio = audio[start:end]
 
-            return audio
+        # Generate embeddings using OpenL3
+        # Returns: (embedding, timestamps)
+        # embedding shape: (num_frames, 512)
+        embeddings, timestamps = openl3.get_audio_embedding(
+            audio,
+            sr,
+            model=self.model,
+            input_repr=self.input_repr,
+            content_type=self.content_type,
+            embedding_size=self.embedding_size,
+            hop_size=self.hop_size
+        )
 
-        except Exception as e:
-            logger.error(f"Error loading audio from {audio_path}: {e}")
-            raise
+        # Aggregate frame-level embeddings
+        # Normalize each frame FIRST, then aggregate
+        # This preserves directional information better
+        embeddings_normalized = embeddings / np.linalg.norm(embeddings, axis=1, keepdims=True)
 
-    def generate_embedding(self, audio_path: str) -> np.ndarray:
-        """
-        Generate embedding vector for an audio file.
+        # Take mean of normalized embeddings
+        embedding_mean = np.mean(embeddings_normalized, axis=0)
 
-        Args:
-            audio_path: Path to audio file
+        # Normalize again to unit length
+        embedding_final = embedding_mean / np.linalg.norm(embedding_mean)
 
-        Returns:
-            Normalized embedding vector (512-dim for CLAP)
-        """
-        try:
-            # Load audio
-            audio = self.load_audio(audio_path)
-
-            # Generate embedding using CLAP
-            with torch.no_grad():
-                audio_tensor = torch.from_numpy(audio).unsqueeze(0).to(self.device)
-                embedding = self.model.get_audio_embedding_from_data(
-                    x=audio_tensor,
-                    use_tensor=True
-                )
-
-            # Convert to numpy and normalize
-            embedding_np = embedding.cpu().numpy().flatten()
-            embedding_normalized = embedding_np / np.linalg.norm(embedding_np)
-
-            logger.info(f"Generated embedding of shape {embedding_normalized.shape}")
-            return embedding_normalized
-
-        except Exception as e:
-            logger.error(f"Error generating embedding: {e}")
-            raise
+        return embedding_final
 
     def calculate_similarity(self, embedding1: np.ndarray, embedding2: np.ndarray) -> float:
         """
         Calculate cosine similarity between two embeddings.
 
         Args:
-            embedding1: First embedding vector
-            embedding2: Second embedding vector
+            embedding1: First embedding vector (already normalized)
+            embedding2: Second embedding vector (already normalized)
 
         Returns:
             Cosine similarity score (0-1)
         """
-        # Ensure normalized
-        emb1_norm = embedding1 / np.linalg.norm(embedding1)
-        emb2_norm = embedding2 / np.linalg.norm(embedding2)
+        try:
+            # Since embeddings are already normalized, cosine similarity = dot product
+            similarity = np.dot(embedding1, embedding2)
 
-        # Cosine similarity
-        similarity = np.dot(emb1_norm, emb2_norm)
+            # Clip to [0, 1] range
+            return float(np.clip(similarity, 0, 1))
 
-        return float(similarity)
+        except Exception as e:
+            logger.error("Error calculating similarity: %s", e)
+            raise
 
 
 # Global instance

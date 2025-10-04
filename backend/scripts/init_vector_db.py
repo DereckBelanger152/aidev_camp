@@ -5,7 +5,7 @@ Script to initialize the vector database with top tracks from Deezer.
 This script:
 1. Fetches top N tracks from Deezer charts
 2. Downloads preview audio for each track
-3. Generates embeddings using CLAP model
+3. Generates embeddings using OpenL3 model
 4. Stores embeddings in ChromaDB
 
 Usage:
@@ -34,14 +34,15 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def init_database(count: int = 1000, reset: bool = False, resume: bool = False):
+def init_database(count: int = 1000, reset: bool = False, resume: bool = False, use_random: bool = True):
     """
-    Initialize the vector database with top tracks.
+    Initialize the vector database with tracks.
 
     Args:
         count: Number of tracks to index
         reset: If True, reset database before initializing
         resume: If True, skip already indexed tracks
+        use_random: If True, fetch random tracks; if False, fetch top chart tracks
     """
     logger.info("=" * 60)
     logger.info("Vector Database Initialization")
@@ -71,9 +72,13 @@ def init_database(count: int = 1000, reset: bool = False, resume: bool = False):
                 logger.info("Initialization cancelled")
                 return
 
-        # Step 1: Fetch top tracks from Deezer
-        logger.info(f"\nStep 1/3: Fetching top {count} tracks from Deezer...")
-        tracks = deezer_service.get_top_tracks(total_count=count)
+        # Step 1: Fetch tracks from Deezer
+        if use_random:
+            logger.info(f"\nStep 1/3: Fetching {count} random tracks from Deezer...")
+            tracks = deezer_service.get_random_tracks(total_count=count)
+        else:
+            logger.info(f"\nStep 1/3: Fetching top {count} tracks from Deezer...")
+            tracks = deezer_service.get_top_tracks(total_count=count)
         logger.info(f"✓ Fetched {len(tracks)} tracks")
 
         if not tracks:
@@ -187,7 +192,7 @@ def init_database(count: int = 1000, reset: bool = False, resume: bool = False):
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(
-        description="Initialize vector database with Deezer top tracks"
+        description="Initialize vector database with Deezer tracks"
     )
     parser.add_argument(
         '--count',
@@ -205,6 +210,13 @@ def main():
         action='store_true',
         help='Resume initialization, skip existing tracks'
     )
+    parser.add_argument(
+        '--mode',
+        type=str,
+        choices=['random', 'top'],
+        default='random',
+        help='Track selection mode: "random" for random tracks, "top" for chart top tracks (default: random)'
+    )
 
     args = parser.parse_args()
 
@@ -216,11 +228,15 @@ def main():
     if args.count > 2000:
         logger.warning(f"Large count ({args.count}) may take several hours")
 
+    # Convert mode to boolean
+    use_random = (args.mode == 'random')
+
     # Run initialization
     init_database(
         count=args.count,
         reset=args.reset,
-        resume=args.resume
+        resume=args.resume,
+        use_random=use_random
     )
 
 

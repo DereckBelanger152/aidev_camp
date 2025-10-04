@@ -27,7 +27,7 @@ async def get_recommendations(
 
     Workflow:
     1. Download preview audio for the given track
-    2. Generate embedding using CLAP model
+    2. Generate embedding using OpenL3 model
     3. Query vector database for top 10 similar tracks
     4. Filter by popularity and return top 3
 
@@ -50,31 +50,41 @@ async def get_recommendations(
         embedding_service = get_embedding_service()
         vector_db = get_vector_db_service()
 
-        # Step 1: Get track metadata
-        logger.info("Fetching track metadata...")
-        track_metadata = deezer_service.get_track_metadata(track_id)
+        # Step 1: Check if track exists in database (use stored embedding for consistency)
+        logger.info("Checking if track exists in database...")
+        stored_track = vector_db.get_track(track_id)
 
-        if not track_metadata:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Track {track_id} not found"
-            )
+        if stored_track:
+            # Use pre-computed embedding from database (ensures consistent similarity scores)
+            logger.info(f"Using stored embedding from database for track {track_id}")
+            embedding = stored_track['embedding']
+        else:
+            # Track not in database, generate embedding from audio
+            logger.info(f"Track {track_id} not in database, generating embedding from audio...")
 
-        if not track_metadata.get('preview_url'):
-            raise HTTPException(
-                status_code=400,
-                detail="Track does not have a preview available"
-            )
+            track_metadata = deezer_service.get_track_metadata(track_id)
 
-        # Step 2: Download preview audio
-        logger.info("Downloading preview audio...")
-        audio_file = deezer_service.download_preview(track_metadata['preview_url'])
+            if not track_metadata:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Track {track_id} not found"
+                )
 
-        # Step 3: Generate embedding
-        logger.info("Generating audio embedding...")
-        embedding = embedding_service.generate_embedding(audio_file)
+            if not track_metadata.get('preview_url'):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Track does not have a preview available"
+                )
 
-        # Step 4: Query vector database for similar tracks
+            # Download preview audio
+            logger.info("Downloading preview audio...")
+            audio_file = deezer_service.download_preview(track_metadata['preview_url'])
+
+            # Generate embedding
+            logger.info("Generating audio embedding...")
+            embedding = embedding_service.generate_embedding(audio_file)
+
+        # Step 2: Query vector database for similar tracks
         logger.info("Querying vector database...")
         results = vector_db.query_similar(embedding, n_results=10)
 
@@ -85,8 +95,9 @@ async def get_recommendations(
                 source_track_id=track_id
             )
 
-        # Step 5: Filter by popularity and get top 3
-        logger.info("Filtering results by popularity...")
+        # Step 5: Get top 3 most similar tracks
+        # Note: ChromaDB already returns results sorted by distance (ascending = most similar first)
+        logger.info("Selecting top 3 most similar tracks...")
         recommendations = []
 
         for track_id_result, distance, metadata in zip(
@@ -98,7 +109,8 @@ async def get_recommendations(
             if track_id_result == track_id:
                 continue
 
-            # Convert distance to similarity score (1 - distance for cosine)
+            # Convert distance to similarity score
+            # ChromaDB cosine distance is in range [0, 2], convert to similarity [0, 1]
             similarity_score = 1 - distance
 
             recommendations.append({
@@ -110,11 +122,11 @@ async def get_recommendations(
                 'cover': metadata.get('cover')
             })
 
-        # Sort by popularity (rank) descending
-        recommendations.sort(key=lambda x: x['popularity'], reverse=True)
+            # Stop after collecting 3 recommendations (already sorted by ChromaDB)
+            if len(recommendations) >= 3:
+                break
 
-        # Take top 3
-        top_3 = recommendations[:3]
+        top_3 = recommendations
 
         # Refresh preview URLs from Deezer API
         logger.info("Refreshing preview URLs from Deezer...")
