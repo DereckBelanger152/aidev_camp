@@ -47,6 +47,9 @@ env/
 # ChromaDB
 backend/app/db/vector_store/
 
+# CLAP Model (large file)
+backend/models/
+
 # Temporary files
 *.tmp
 *.temp
