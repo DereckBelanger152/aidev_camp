@@ -27,7 +27,7 @@ async def lifespan(app: FastAPI):
         # Initialize embedding service (loads CLAP model)
         logger.info("Loading embedding service...")
         embedding_service = get_embedding_service()
-        logger.info(f"Embedding service ready on device: {embedding_service.device}")
+        logger.info(f"Embedding service ready")
 
         # Initialize vector database
         logger.info("Connecting to vector database...")

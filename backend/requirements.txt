@@ -9,10 +9,7 @@ soundfile==0.12.1
 audioread==3.0.1
 
 # ML & Embeddings
-torch==2.5.1
-torchvision==0.20.1
-transformers==4.46.2
-laion-clap==1.1.4
+openl3==0.4.1
 
 # Vector database
 chromadb==0.5.20
@@ -22,7 +19,7 @@ requests==2.32.3
 httpx==0.27.2
 
 # Utilities
-numpy==1.23.5  # Fixed by laion-clap requirement
+numpy==1.23.5
 scipy==1.14.1
 python-multipart==0.0.12
 python-dotenv==1.0.1

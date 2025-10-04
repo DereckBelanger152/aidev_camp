@@ -5,7 +5,7 @@ Script to initialize the vector database with top tracks from Deezer.
 This script:
 1. Fetches top N tracks from Deezer charts
 2. Downloads preview audio for each track
-3. Generates embeddings using CLAP model
+3. Generates embeddings using OpenL3 model
 4. Stores embeddings in ChromaDB
 
 Usage:
