@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+@layer base {
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: linear-gradient(135deg, #0a0a0a 0%, #1a0033 50%, #000a1a 100%);
+    background-attachment: fixed;
+    color: #ffffff;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+}
+
+/* Glassmorphism effect */
+.glass {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #bf40bf, #00f5ff);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #ff10f0, #39ff14);
+}
+
+/* Neon glow effect */
+.neon-glow {
+  box-shadow: 0 0 20px rgba(0, 245, 255, 0.3),
+              0 0 40px rgba(191, 64, 191, 0.2);
+}
+
+.neon-glow:hover {
+  box-shadow: 0 0 30px rgba(0, 245, 255, 0.5),
+              0 0 60px rgba(191, 64, 191, 0.3);
+}
